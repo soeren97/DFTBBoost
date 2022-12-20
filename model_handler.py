@@ -36,16 +36,12 @@ class ModelTrainer():
         self.test_loader = None
         self.optimizer = None
         
-        self.config_name = None
         self.config = None
         
         self.data = None
         self.train_set = None
         self.test_set = None
         self.valid_set = None
-        
-        self.data_interval = None
-        self.old_interval = None
         
         self.model_folder = None
         self.save_model = None
@@ -90,9 +86,7 @@ class ModelTrainer():
                 pred = self.model(X.float())
             
             # Calculate HOMO, LUMO and gap
-            #pred2 = self.find_homo_lumo(pred)
             pred = utils.find_homo_lumo2(pred)
-            Y = utils.find_homo_lumo2(Y)
             
             loss = self.loss_fn(pred, Y)
             loss.backward()  
@@ -102,19 +96,18 @@ class ModelTrainer():
     
     def test(self):
         for data in self.test_loader:
-            # Use GPU
+            # Use GPU if available
             data.to(self.device)  
+
             # Reset gradients
             self.optimizer.zero_grad() 
-            # Passing the node features and the connection info
             
             pred = self.model(data)
             
             pred = utils.find_homo_lumo2(pred)
-            # Calculating the loss and gradients
-            Y = data.y.reshape(-1, 38220)
-            Y = utils.find_homo_lumo2(Y)
+            Y = data.y.reshape(-1, 3)
             
+            # Calculating the loss and gradients
             loss = self.loss_fn(pred, Y)   
         return loss
         
@@ -127,15 +120,11 @@ class ModelTrainer():
         self.train_loader = self.loader(self.train_set, 
                             batch_size = self.batch_size, 
                             shuffle = True,
-                            num_workers = 5,
-                            #drop_last = True
                             )
         
         self.test_loader = self.loader(self.test_set, 
                             batch_size = self.batch_size, 
-                            shuffle = True,
-                            num_workers = 5,
-                            #drop_last = True
+                            shuffle = True
                             )
         
         for epoch in tqdm(range(self.epochs), 
