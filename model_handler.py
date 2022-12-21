@@ -76,7 +76,7 @@ class ModelTrainer():
                 data.to(self.device)  
                 
                 pred = self.model(data)
-                                
+                
                 Y = data.y.reshape(-1, 3)
                 
             else:
@@ -86,10 +86,12 @@ class ModelTrainer():
                 pred = self.model(X.float())
             
             # Calculate HOMO, LUMO and gap
-            pred = utils.find_homo_lumo2(pred)
+            pred = utils.find_homo_lumo(pred)
             
             loss = self.loss_fn(pred, Y)
+            
             loss.backward()  
+            
             # Update using the gradients
             self.optimizer.step()   
         return loss
@@ -104,7 +106,7 @@ class ModelTrainer():
             
             pred = self.model(data)
             
-            pred = utils.find_homo_lumo2(pred)
+            pred = utils.find_homo_lumo(pred)
             Y = data.y.reshape(-1, 3)
             
             # Calculating the loss and gradients

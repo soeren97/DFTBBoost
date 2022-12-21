@@ -58,7 +58,7 @@ def convert_tril(tril_tensor):
     tensor[idx,idx] = tensor[idx,idx]
     return tensor
 
-def find_homo_lumo2(preds):
+def find_homo_lumo(preds):
     # Convert tril tensors to full tensors
     hamiltonians = [convert_tril(pred[:19110]) for pred in preds]
     overlaps = [convert_tril(pred[19110:]).fill_diagonal_(1) for pred in preds]
