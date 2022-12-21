@@ -58,27 +58,6 @@ def convert_tril(tril_tensor):
     tensor[idx,idx] = tensor[idx,idx]
     return tensor
 
-def find_homo_lumo(preds):
-    energies = []
-    for pred in preds:
-        hamiltonian = convert_tril(pred[:19110])
-        
-        overlap = convert_tril(pred[19110:]).fill_diagonal_(1)
-        
-        eigenvalues = eigvalsh(overlap.inverse() @ hamiltonian)
-        
-        eigenvalues_pos = eigenvalues[eigenvalues > 0]
-        
-        eigenvalues_neg = eigenvalues[eigenvalues < 0]
-        
-        HOMO = eigenvalues_neg[-5]#.max()
-        
-        LUMO = eigenvalues_pos[5]#.min()
-                    
-        energies.append([HOMO, LUMO, LUMO-HOMO])
-            
-    return torch.tensor(energies, requires_grad=True)
-
 def find_homo_lumo2(preds):
     # Convert tril tensors to full tensors
     hamiltonians = [convert_tril(pred[:19110]) for pred in preds]
