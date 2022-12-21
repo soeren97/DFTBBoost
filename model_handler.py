@@ -130,8 +130,9 @@ class ModelTrainer():
                             )
         
         for epoch in tqdm(range(self.epochs), 
-                          desc = 'Training', 
-                          total = self.epochs):            
+                          desc = 'Training : ', 
+                          total = self.epochs,
+                          miniters = 10):            
             
             loss_train = self.train()
             losses_train.append(loss_train.cpu().detach())
@@ -139,6 +140,8 @@ class ModelTrainer():
             loss_test = self.test()
             losses_test.append(loss_test.cpu().detach())
             
+            tqdm.set_description(f'Test Loss is {loss_test}')
+
             self.evaluate_early_stopping(loss_test)
             
             if self.early_stopping:
