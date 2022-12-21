@@ -129,8 +129,7 @@ class ModelTrainer():
                             shuffle = True
                             )
         
-        for epoch in tqdm(range(self.epochs), 
-                          desc = 'Training : ', 
+        for epoch in tqdm(range(self.epochs),  
                           total = self.epochs,
                           miniters = 10):            
             
@@ -140,7 +139,7 @@ class ModelTrainer():
             loss_test = self.test()
             losses_test.append(loss_test.cpu().detach())
             
-            tqdm.set_description(f'Test Loss is {loss_test}')
+            tqdm.set_description(f'Training : Test Loss is {loss_test}')
 
             self.evaluate_early_stopping(loss_test)
             
