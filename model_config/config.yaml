@@ -1,7 +1,7 @@
 lr: 10e-4
-decay_rate: 0.0005
+decay_rate: 0.005
 loss_fn: MSE
 epochs: 300
-batch_size: 512
-start_patience: 100
+batch_size: 1024
+start_patience: 50
 model: GNN_plus

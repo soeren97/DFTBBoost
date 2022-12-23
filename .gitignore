@@ -8,3 +8,4 @@ write_hsd.py
 prepare*
 g16_reformating.py
 compare_dftb_g16.py
+Optuna/

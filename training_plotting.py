@@ -28,6 +28,8 @@ class Plotter():
         plt.xlabel('Epoch')
         plt.ylabel('Loss')
         plt.tight_layout()
+        plt.ylim(top = 7)
+        #plt.yscale('log')
         if self.save:
             plt.savefig(self.path + 'Loss.png')
     

@@ -25,9 +25,12 @@ class ModelTrainer():
         self.dataloader = None
         
         self.loss_fn = None
-        self.best_loss = 10e6
+        self.best_loss = 10e2
         self.patience = 100
+        self.reset_patience = None
         self.early_stopping = False
+        self.lr = 0
+        self.decay_rate = 0
         
         self.epochs = None
         self.batch_size = None
@@ -59,11 +62,11 @@ class ModelTrainer():
         self.train_set, self.test_set = utils.random_split(self.data, [.8,.2])
 
     def evaluate_early_stopping(self, loss):
-        if self.best_loss < loss:
+        if not self.best_loss >= loss:
             self.patience -= 1
         else:
             self.best_loss = loss
-            self.patience = self.config['start_patience']
+            self.patience = self.reset_patience
         
         if self.patience == 0:
             self.early_stopping = True         
@@ -117,8 +120,6 @@ class ModelTrainer():
         losses_train = []
         losses_test = []
         
-        self.setup_data()
-        
         self.train_loader = self.loader(self.train_set, 
                             batch_size = self.batch_size, 
                             shuffle = True,
@@ -129,22 +130,23 @@ class ModelTrainer():
                             shuffle = True
                             )
         
-        for epoch in tqdm(range(self.epochs),  
+        for epoch in (pbar:= tqdm(range(self.epochs),  
                           total = self.epochs,
-                          miniters = 10):            
+                          desc = 'Training')):            
             
             loss_train = self.train()
             losses_train.append(loss_train.cpu().detach())
             
             loss_test = self.test()
             losses_test.append(loss_test.cpu().detach())
-            
-            tqdm.set_description(f'Training : Test Loss is {loss_test}')
+
+            pbar.set_description(f'Test loss {loss_test:.6f}')
 
             self.evaluate_early_stopping(loss_test)
             
-            if self.early_stopping:
+            if self.early_stopping and self.save_model:
                 print(f' Best loss {self.best_loss}')
+                print(self.model_folder)
                 
                 losses = np.array([losses_train,
                             losses_test]).T
@@ -166,19 +168,24 @@ class ModelTrainer():
         self.config = utils.load_config()
         self.epochs = self.config['epochs']
         self.batch_size = int(self.config['batch_size'] / 32)
+        self.decay_rate = float(self.config['decay_rate'])
+        self.lr = float(self.config['lr'])
+        self.reset_patience = self.config['start_patience']
         self.model = eval(self.config['model'])().to(self.device)
         
         self.save_model = True
         self.model_folder = 'Models/m' + str(time.time())[:-8] + '/'
 
         self.optimizer = torch.optim.Adam(self.model.parameters(), 
-                                    lr = float(self.config['lr']), 
-                                    weight_decay=float(self.config['decay_rate'])
+                                    lr = self.lr, 
+                                    weight_decay=self.decay_rate
                                     )
         self.loss_fn = eval(self.config['loss_fn'])().to(self.device)
         
         self.data_intervals = os.listdir('Data/datasets')
         
+        self.setup_data()
+
         loss_df = self.train_model()
         
         if self.save_model:
