@@ -57,7 +57,7 @@ class GNN(torch.nn.Module):
 class GNN_plus(torch.nn.Module):
     def __init__(self):
          super(GNN_plus, self).__init__()
-         self.embedding_size = 256
+         self.embedding_size = 64
          
          self.initial_conv = GATConv(8, self.embedding_size)
          #self.conv1 = GATConv(self.embedding_size, self.embedding_size)

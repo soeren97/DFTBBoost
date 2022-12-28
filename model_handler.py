@@ -133,7 +133,6 @@ class ModelTrainer():
         for epoch in (pbar:= tqdm(range(self.epochs),  
                           total = self.epochs,
                           desc = 'Training')):            
-            
             loss_train = self.train()
             losses_train.append(loss_train.cpu().detach())
             
@@ -143,7 +142,7 @@ class ModelTrainer():
             pbar.set_description(f'Test loss {loss_test:.6f}')
 
             self.evaluate_early_stopping(loss_test)
-            
+
             if self.early_stopping and self.save_model:
                 print(f' Best loss {self.best_loss}')
                 print(self.model_folder)
