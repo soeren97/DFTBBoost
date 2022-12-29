@@ -17,12 +17,12 @@ optuna.logging.set_verbosity(optuna.logging.WARNING)
 def hyperparameter_objective(trail, trainer):
     trainer.model = GNN_plus().to(trainer.device)    
 
-    trainer.lr = trail.suggest_float('Learning_rate', 1e-6, 1e-2, log=True)
+    trainer.lr = trail.suggest_float('Learning_rate', 1e-6, 1e-3, log=True)
     trainer.decay_rate = trail.suggest_float('Decay_rate', 1e-4, 0.1, step = 1e-4)
     trainer.batch_size = 2**trail.suggest_int('Batch_size', 8, 10)
     epsilon = trail.suggest_float('Epsilon', 1e-7, 1e-4)
     trainer.loss_fn = MSE()
-    trainer.reset_patience = 5
+    trainer.reset_patience = 10
 
     trainer.optimizer = torch.optim.Adam(trainer.model.parameters(), 
                                     lr = trainer.lr, 

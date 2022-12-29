@@ -37,8 +37,9 @@ class ModelTrainer():
 
         self.train_loader = None
         self.test_loader = None
+
         self.optimizer = None
-        
+
         self.config = None
         
         self.data = None
@@ -96,7 +97,9 @@ class ModelTrainer():
             loss.backward()  
             
             # Update using the gradients
-            self.optimizer.step()   
+
+            self.optimizer.step()
+ 
         return loss
     
     def test(self):
@@ -139,7 +142,7 @@ class ModelTrainer():
             loss_test = self.test()
             losses_test.append(loss_test.cpu().detach())
 
-            pbar.set_description(f'Test loss {loss_test:.6f}')
+            pbar.set_description(f'Test loss {loss_test:.6f}, early_stopping = {self.early_stopping}')
 
             self.evaluate_early_stopping(loss_test)
 
@@ -155,6 +158,15 @@ class ModelTrainer():
                                         'Train_loss',
                                         'Test_loss'])
         
+            elif self.early_stopping:
+                losses = np.array([losses_train,
+                            losses_test]).T
+        
+                return pd.DataFrame(losses, 
+                                    columns = [
+                                        'Train_loss',
+                                        'Test_loss'])
+
         losses = np.array([losses_train,
                             losses_test]).T
         
@@ -179,6 +191,7 @@ class ModelTrainer():
                                     lr = self.lr, 
                                     weight_decay=self.decay_rate
                                     )
+
         self.loss_fn = eval(self.config['loss_fn'])().to(self.device)
         
         self.data_intervals = os.listdir('Data/datasets')
