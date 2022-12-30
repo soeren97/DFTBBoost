@@ -26,7 +26,7 @@ class ModelTrainer():
         
         self.loss_fn = None
         self.best_loss = 10e2
-        self.patience = 100
+        self.patience = 50
         self.reset_patience = None
         self.early_stopping = False
         self.lr = 0
@@ -134,15 +134,16 @@ class ModelTrainer():
                             )
         
         for epoch in (pbar:= tqdm(range(self.epochs),  
-                          total = self.epochs,
-                          desc = 'Training')):            
+                                  total = self.epochs,
+                                  desc = 'Training',
+                                  leave = False)):            
             loss_train = self.train()
             losses_train.append(loss_train.cpu().detach())
             
             loss_test = self.test()
             losses_test.append(loss_test.cpu().detach())
 
-            pbar.set_description(f'Test loss {loss_test:.6f}, early_stopping = {self.early_stopping}')
+            pbar.set_description(f'Test loss {loss_test:.2E}')
 
             self.evaluate_early_stopping(loss_test)
 

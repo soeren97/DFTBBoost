@@ -57,7 +57,7 @@ class GNN(torch.nn.Module):
 class GNN_plus(torch.nn.Module):
     def __init__(self):
          super(GNN_plus, self).__init__()
-         self.embedding_size = 64
+         self.embedding_size = 16
          
          self.initial_conv = GATConv(8, self.embedding_size)
          #self.conv1 = GATConv(self.embedding_size, self.embedding_size)
@@ -67,8 +67,8 @@ class GNN_plus(torch.nn.Module):
          
          self.batchnorm = BatchNorm(self.embedding_size)
 
-         self.lin1 = Linear(self.embedding_size * 2, self.embedding_size * 4)
-         self.out = Linear(self.embedding_size * 4, 19110 * 2) 
+         #self.lin1 = Linear(self.embedding_size, self.embedding_size)
+         self.out = Linear(self.embedding_size * 2, 19110 * 2) 
     
     def forward(self, data):
         x = data.x.float()
@@ -106,7 +106,7 @@ class GNN_plus(torch.nn.Module):
         hidden = torch.cat([gmp(hidden, batch_index), 
                             gap(hidden, batch_index)], dim=1)
         
-        hidden = self.lin1(hidden)
+        #hidden = self.lin1(hidden)
         
         out = self.out(hidden)
         
