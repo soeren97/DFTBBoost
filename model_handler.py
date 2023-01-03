@@ -9,6 +9,8 @@ import numpy as np
 import torch
 
 from torch_geometric.loader import DataLoader as GNNDataloader
+from torch_geometric.data import Batch
+
 from torchmetrics import MeanAbsolutePercentageError as MAPE
 from torchmetrics import MeanSquaredError as MSE
 from torchmetrics import MeanAbsoluteError as MAE
@@ -73,10 +75,13 @@ class ModelTrainer():
             self.early_stopping = True         
 
     def train(self):  
-        for data in self.train_loader:
+        for batch in self.train_loader:
             self.optimizer.zero_grad() 
 
             if self.model.__class__.__name__ in ['GNN', 'GNN_plus']:
+                
+                smiles, data = batch[0], Batch.from_data_list(batch[1])
+
                 data.to(self.device)  
                 
                 pred = self.model(data)
