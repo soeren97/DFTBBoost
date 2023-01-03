@@ -19,10 +19,12 @@ def hyperparameter_objective(trail, trainer):
 
     trainer.lr = trail.suggest_float('Learning_rate', 1e-6, 1e-3, log=True)
     trainer.decay_rate = trail.suggest_float('Decay_rate', 1e-4, 0.1, step = 1e-4)
-    trainer.batch_size = 2**trail.suggest_int('Batch_size', 7, 9)
+    trainer.batch_size = 2**trail.suggest_int('Batch_size', 7, 8)
     epsilon = trail.suggest_float('Epsilon', 1e-7, 1e-4)
     trainer.loss_fn = MSLE()
     trainer.reset_patience = 20
+
+    print(trainer.batch_size)
 
     trainer.optimizer = torch.optim.Adam(trainer.model.parameters(), 
                                     lr = trainer.lr, 
@@ -39,7 +41,7 @@ def hyperparameter_objective(trail, trainer):
 now = datetime.now().strftime("%y_%m_%d_%H%M%S")
 
 model_trainer = ModelTrainer()
-model_trainer.epochs = 300
+model_trainer.epochs = 100
 model_trainer.data_intervals = os.listdir('Data/datasets')
 model_trainer.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 model_trainer.model = GNN_plus().to(model_trainer.device)
