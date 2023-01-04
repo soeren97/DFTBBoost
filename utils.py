@@ -58,7 +58,7 @@ def convert_tril(tril_tensor):
     tensor[idx,idx] = tensor[idx,idx]
     return tensor
 
-def find_homo_lumo(preds):
+def find_homo_lumo_pred(preds):
     # Convert tril tensors to full tensors
     hamiltonians = [convert_tril(pred[:19110]) for pred in preds]
     overlaps = [convert_tril(pred[19110:]).fill_diagonal_(1) for pred in preds]
@@ -79,6 +79,27 @@ def find_homo_lumo(preds):
 
     # Select fifth eigenvalue above zero
     LUMO = torch.nan_to_num(eigenvalues[range(eigenvalues.shape[0]), LUMO_idx.abs()])
+
+    # Compute HOMO-LUMO gap
+    gap = LUMO - HOMO
+
+    return torch.stack([HOMO, LUMO, gap], dim=1)
+    
+def find_homo_lumo_true(hamiltonian, overlap, n_electrons):
+    overlap = torch.tensor(overlap)
+    hamiltonian = torch.tensor(hamiltonian)
+
+    # Compute eigenvalues
+    eigenvalues = eigvalsh(overlap.inverse() @ hamiltonian)
+
+    positive_eigenvalues = eigenvalues[eigenvalues>0]
+    negative_eigenvalues = eigenvalues[eigenvalues<0]
+
+    # Select fifth eigenvalue bellow zero
+    HOMO = positive_eigenvalues[5]
+
+    # Select fifth eigenvalue above zero
+    LUMO = negative_eigenvalues[-5]
 
     # Compute HOMO-LUMO gap
     gap = LUMO - HOMO

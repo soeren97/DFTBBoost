@@ -388,7 +388,7 @@ class DataTransformer():
             
             Y = torch.cat((hamiltonian_g16, overlap_g16))
 
-            Y_HOMO_LUMO = utils.find_homo_lumo(Y.reshape(-1, 38220))
+            Y_HOMO_LUMO = utils.find_homo_lumo_true(data['Hamiltonian_g16'], data['Overlap_g16'], None)
 
             CNN_X = torch.cat((hamdftb_pad, overdftb_pad))
             
