@@ -1,20 +1,6 @@
 import numpy as np
 import os
 import pandas as pd
-import basis_set_exchange as bse
-
-def retrive_basis(element):
-
-    bs = bse.get_basis('STO-3G', 
-                      elements=element, 
-                      fmt='gaussian94', 
-                      uncontract_general=True, 
-                      uncontract_spdf=True, 
-                      uncontract_segmented=True, 
-                      make_general=True, 
-                      optimize_general=True)[428:]
-    return bs
-
 
 def extract_from_xyz(file_nr):    
     
@@ -56,7 +42,7 @@ def extract_from_xyz(file_nr):
         com_writer.write('%NprocShared=4\n')
         com_writer.write('%Mem=8GB\n')
         com_writer.write('%chk=mol.chk\n')
-        com_writer.write('# nosym PBEPBE/gen pseudo=read\n')
+        com_writer.write('# nosym PBEPBE/sto-3g\n')
         com_writer.write('# iop(5/33=3)\n')
         com_writer.write('# iop(3/33=4)\n\n')
         com_writer.write(title)
@@ -66,18 +52,12 @@ def extract_from_xyz(file_nr):
             com_writer.write("{:4} {:11.6f} {:11.6f} {:11.6f}\n".format(
                 atom[0], float(atom[1]), float(atom[2]), float(atom[3])))
             atom_list.append(atom[0])
-        com_writer.write('\n')
-        
-        atom_list = [*set(atom_list)]
-        
-        #Write basis set
-        for atom in atom_list:
-            com_writer.write(retrive_basis(atom[0]))
+
         com_writer.write('\n\n')
         
 data_location = os.getcwd() + '/Data/xyz_wrong_format/'
 
-file_numbers = pd.DataFrame(range(70000, 100001))
+file_numbers = pd.DataFrame(range(0, 100001))
 
 file_numbers[0].apply(extract_from_xyz)
 
