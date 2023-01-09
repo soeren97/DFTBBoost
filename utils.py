@@ -85,23 +85,23 @@ def find_homo_lumo_pred(preds):
 
     return torch.stack([HOMO, LUMO, gap], dim=1)
     
-def find_homo_lumo_true(hamiltonian, overlap):
+def find_homo_lumo_true(hamiltonian, overlap, n_electrons):
     overlap = torch.tensor(overlap)
     hamiltonian = torch.tensor(hamiltonian)
 
     # Compute eigenvalues
     eigenvalues = eigvalsh(overlap.inverse() @ hamiltonian)
 
-    positive_eigenvalues = eigenvalues[eigenvalues>0]
-    negative_eigenvalues = eigenvalues[eigenvalues<0]
+    # find index of HOMO
+    i = n_electrons // 2 # fix
 
     # Select fifth eigenvalue bellow zero
-    HOMO = positive_eigenvalues[5]
+    HOMO = eigenvalues[i + 5]
 
     # Select fifth eigenvalue above zero
-    LUMO = negative_eigenvalues[-5]
+    LUMO = eigenvalues[i - 6]
 
     # Compute HOMO-LUMO gap
     gap = LUMO - HOMO
 
-    return torch.stack([HOMO, LUMO, gap], dim=1)
+    return torch.stack([HOMO, LUMO, gap])

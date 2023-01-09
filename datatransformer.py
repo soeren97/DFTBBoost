@@ -284,6 +284,12 @@ class DataTransformer():
                             3: 4,
                             4: 4}
 
+        atom_to_electron = {0: 1,
+                            1: 6,
+                            2: 7,
+                            3: 8,
+                            4: 9}
+
         bond_to_orbitals = {0: 1,
                             1: 1,
                             2: 2,
@@ -297,9 +303,12 @@ class DataTransformer():
         nodes_ham = diagonal_ham.clone()
 
         position = 0
+        n_electrons = 0
         nodes_ham_split = []
 
         for atom in atoms:
+            n_electrons += atom_to_electron[int(atom)]
+
             nr_orbitals = atom_to_orbitals[int(atom)]
             new_position = position + nr_orbitals
             node = nodes_ham[position : new_position]
@@ -343,7 +352,7 @@ class DataTransformer():
 
         edge_list = torch.tensor(np.array(edge_list))
 
-        return nodes_ham_split, edge_list
+        return nodes_ham_split, edge_list, n_electrons
         
 
     def smiles2graph(self):
@@ -388,8 +397,6 @@ class DataTransformer():
             
             Y = torch.cat((hamiltonian_g16, overlap_g16))
 
-            Y_HOMO_LUMO = utils.find_homo_lumo_true(data['Hamiltonian_g16'], data['Overlap_g16'], None)
-
             CNN_X = torch.cat((hamdftb_pad, overdftb_pad))
             
             CNN_Y = torch.cat((hamg16_pad, overg16_pad))
@@ -405,71 +412,74 @@ class DataTransformer():
             # This function includes what type of bond connects two nodes and is used as edge_attr
             bond_attributes = from_smiles(smile, with_hydrogen=True).edge_attr
 
-            try:    
-                nx.set_node_attributes(graph, {
-                    k: {
-                        'x' : [feature[k], 
-                               coord[k][0], 
-                               coord[k][1], 
-                               coord[k][2]
-                               ]
-                        }
-                    for k, d in dict(graph.nodes(data=True)).items()
-                })
+        
+            nx.set_node_attributes(graph, {
+                k: {
+                    'x' : [feature[k], 
+                            coord[k][0], 
+                            coord[k][1], 
+                            coord[k][2]
+                            ]
+                    }
+                for k, d in dict(graph.nodes(data=True)).items()
+            })
 
-                graph = from_networkx(graph)
-                
-                del graph['element'], graph['aromatic'], graph['charge']
-
-                # [:,0] describes what type of bond the edge is, ie a single, double or triple bond
-                edge_attributes = bond_attributes[:,0].clone()
-
-                data_graph = GraphData(x = graph.x, 
-                                      edge_index = graph.edge_index, 
-                                      edge_attr = edge_attributes,
-                                      y = Y_HOMO_LUMO
-                                      )
+            graph = from_networkx(graph)
             
-                num_nodes = graph.num_nodes
+            del graph['element'], graph['aromatic'], graph['charge']
 
-                data_graph.num_nodes = num_nodes
+            # [:,0] describes what type of bond the edge is, ie a single, double or triple bond
+            edge_attributes = bond_attributes[:,0].clone()
+
+            data_graph = GraphData(x = graph.x, 
+                                    edge_index = graph.edge_index, 
+                                    edge_attr = edge_attributes,
+                                    )
+        
+            num_nodes = graph.num_nodes
+
+            data_graph.num_nodes = num_nodes
+            
+            try:
+                nodes_ham, edge_attributes, n_electrons = self.extract_data_from_matrices(graph, 
+                                                                            hamdftb_pad, 
+                                                                            overdftb_pad,
+                                                                            edge_attributes
+                                                                            )
+
             except:
-                pass
+                print(f'{smile} failed')
+                continue
 
-            try: 
-                nodes_ham, edge_attributes = self.extract_data_from_matrices(graph, 
-                                                                             hamdftb_pad, 
-                                                                             overdftb_pad,
-                                                                             edge_attributes
-                                                                             )
+            Y_HOMO_LUMO = utils.find_homo_lumo_true(data['Hamiltonian_g16'], data['Overlap_g16'], n_electrons)
 
-                nx.set_node_attributes(graph_plus, {
-                    k: {
-                        'x' : [feature[k], 
-                               coord[k][0], 
-                               coord[k][1], 
-                               coord[k][2],
-                               nodes_ham[i][0],
-                               nodes_ham[i][1],
-                               nodes_ham[i][2],
-                               nodes_ham[i][3]
-                               ]
-                        }
-                    for i, (k, d) in enumerate(dict(graph_plus.nodes(data=True)).items())
-                })  
+            data_graph.y = Y_HOMO_LUMO
 
-                graph_plus = from_networkx(graph_plus)
-                
-                del graph['element'], graph['aromatic'], graph['charge']
+            nx.set_node_attributes(graph_plus, {
+                k: {
+                    'x' : [feature[k], 
+                            coord[k][0], 
+                            coord[k][1], 
+                            coord[k][2],
+                            nodes_ham[i][0],
+                            nodes_ham[i][1],
+                            nodes_ham[i][2],
+                            nodes_ham[i][3]
+                            ]
+                    }
+                for i, (k, d) in enumerate(dict(graph_plus.nodes(data=True)).items())
+            })  
 
-                data_graph_plus = GraphData(x=graph_plus.x, 
-                                       edge_index=graph_plus.edge_index, 
-                                       edge_attr=edge_attributes,
-                                       y = Y_HOMO_LUMO)
+            graph_plus = from_networkx(graph_plus)
+            
+            del graph['element'], graph['aromatic'], graph['charge']
 
-                data_graph_plus.num_nodes = num_nodes
-            except:
-                pass
+            data_graph_plus = GraphData(x=graph_plus.x, 
+                                    edge_index=graph_plus.edge_index, 
+                                    edge_attr=edge_attributes,
+                                    y = Y_HOMO_LUMO)
+
+            data_graph_plus.num_nodes = num_nodes
             
             smiles.append(smile)
             
@@ -502,13 +512,11 @@ class DataTransformer():
 
                 GNN_data.to_pickle(save_location + 'GNN/'+ file_name)
                 
-                try:
-                    GNN_plus = {'SMILES': smiles, 'GNN_plus': GNNplus_data}
-                    GNNplus_data = pd.DataFrame(GNN_plus)
-                    GNNplus_data.to_pickle(save_location + 'GNN_plus/'+ file_name)
-                except:
-                    pass
-
+                
+                GNN_plus = {'SMILES': smiles, 'GNN_plus': GNNplus_data}
+                GNNplus_data = pd.DataFrame(GNN_plus)
+                GNNplus_data.to_pickle(save_location + 'GNN_plus/'+ file_name)
+            
                 GNN_data = []
                 GNNplus_data = []
                 CNN_data = []
@@ -558,10 +566,7 @@ def main():
 
     for i in data_intervals:
         datatransformer.data_interval = i
-        try:
-            datatransformer.create_dataset()
-        except:
-            pass
+        datatransformer.create_dataset()
         gc.collect()
     
 if __name__ == "__main__":
