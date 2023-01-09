@@ -85,7 +85,7 @@ def find_homo_lumo_pred(preds):
 
     return torch.stack([HOMO, LUMO, gap], dim=1)
     
-def find_homo_lumo_true(hamiltonian, overlap, n_electrons):
+def find_homo_lumo_true(hamiltonian, overlap):
     overlap = torch.tensor(overlap)
     hamiltonian = torch.tensor(hamiltonian)
 

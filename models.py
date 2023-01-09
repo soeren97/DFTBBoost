@@ -17,7 +17,7 @@ class GNN(torch.nn.Module):
          #self.conv4 = GCNConv(self.embedding_size, self.embedding_size)
          
          self.lin1 = Linear(self.embedding_size * 2, self.embedding_size * 4)
-         self.out = Linear(self.embedding_size * 4, 19110 * 2) 
+         self.out = Linear(self.embedding_size * 4, 2145 * 2) 
     
     def forward(self, data):
         x = data.x.float()
@@ -68,7 +68,7 @@ class GNN_plus(torch.nn.Module):
          self.batchnorm = BatchNorm(self.embedding_size)
 
          #self.lin1 = Linear(self.embedding_size, self.embedding_size)
-         self.out = Linear(self.embedding_size * 2, 19110 * 2) 
+         self.out = Linear(self.embedding_size * 2, 2145 * 2) 
     
     def forward(self, data):
         x = data.x.float()
@@ -158,7 +158,7 @@ class CNN(torch.nn.Module): # fix dimensions
          #self.conv4 = Conv2d(self.embedding_size, self.embedding_size)
          
          self.lin1 = Linear(self.embedding_size * 2, self.embedding_size * 4)
-         self.out = Linear(self.embedding_size * 4, 19110 * 2) 
+         self.out = Linear(self.embedding_size * 4, 2145 * 2) 
     
     def forward(self, x):
         hidden = self.initial_conv(x)       #[256, 386, 191]
@@ -199,7 +199,7 @@ class NN(torch.nn.Module):
          self.initial = Linear(self.embedding_size , self.embedding_size)
          self.lin1 = Linear(self.embedding_size, self.embedding_size * 2)
          self.lin2 = Linear(self.embedding_size * 2, self.embedding_size * 4)
-         self.out = Linear(self.embedding_size * 4, 19110 * 2) 
+         self.out = Linear(self.embedding_size * 4, 2145 * 2) 
     
     def forward(self, x):
         hidden = self.initial_conv(x)

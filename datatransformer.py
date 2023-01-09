@@ -29,7 +29,7 @@ class DataTransformer():
         self.data_location_g16 = None
         self.data_interval = None
         
-        self.max_dim = 195
+        self.max_dim = 65
         self.elements = None
 
         self.dftb_data = None
@@ -237,7 +237,7 @@ class DataTransformer():
         except:
             return None, None
         
-        tensor = tensor_padded[np.tril_indices(195)]
+        tensor = tensor_padded[np.tril_indices(self.max_dim)]
         
         return tensor, tensor_padded
     
@@ -552,10 +552,10 @@ class DataTransformer():
   
 def main():
     datatransformer = DataTransformer()
-    data_intervals = ['0-10000', '10001-20000', '20001-30000',
-                      '30001-40000', '40001-50000', '50001-60000',
-                      '60001-70000', '70001-80000', 
-                      '80001-90000']
+    data_intervals = ['0-10000']
+    for i in range(10001, 100001, 10000):
+        data_intervals.append(f"{i}-{i + 10000 - 1}")
+
     for i in data_intervals:
         datatransformer.data_interval = i
         try:
