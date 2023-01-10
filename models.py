@@ -13,59 +13,7 @@ class GNN(torch.nn.Module):
 
         self.initial_conv = GATConv(4, self.embedding_size)
         self.conv1 = GATConv(self.embedding_size, self.embedding_size)
-
-    def forward(self, data):
-        x = data.x.float()
-        edge_index = data.edge_index
-        batch_index = data.batch
-        edge_attr = data.edge_attr
-
-        hidden = self.initial_conv(x, edge_index, edge_attr)
-        hidden = torch.tanh(hidden)
-        hidden = F.dropout(hidden, p=0.2)
-
-        hidden = self.batchnorm(hidden)
-
-        hidden = self.conv1(hidden, edge_index, edge_attr)
-        hidden = torch.tanh(hidden)
-        hidden = F.dropout(hidden, p=0.2)
-
-        # hidden = self.conv2(hidden, edge_index)
-        # hidden = torch.tanh(hidden)
-        # hidden = F.dropout(hidden, p=0.2)
-
-        # hidden = self.conv3(hidden, edge_index)
-        # hidden = torch.tanh(hidden)
-        # hidden = F.dropout(hidden, p=0.2)
-
-        # hidden = self.conv4(hidden, edge_index)
-        # hidden = torch.tanh(hidden)
-        # hidden = F.dropout(hidden, p=.2)
-
-        # Global Pooling (stack different aggregations)
-        hidden = torch.cat([gmp(hidden, batch_index), gap(hidden, batch_index)], dim=1)
-
-        hidden = self.lin1(hidden)
-
-        out = self.out(hidden)
-
-        return out
-
-
-class GNN_plus(torch.nn.Module):
-    def __init__(self):
-        super(GNN_plus, self).__init__()
-        self.embedding_size = 8
-
-        self.initial_conv = GATConv(8, self.embedding_size)
-        self.conv1 = GATConv(self.embedding_size, self.embedding_size)
-        # self.conv2 = GATConv(self.embedding_size, self.embedding_size)
-        # self.conv3 = GATConv(self.embedding_size, self.embedding_size)
-        # self.conv4 = GATConv(self.embedding_size, self.embedding_size)
-
         self.batchnorm = BatchNorm(self.embedding_size)
-
-        # self.lin1 = Linear(self.embedding_size, self.embedding_size)
         self.out = Linear(self.embedding_size * 2, 2145 * 2)
 
     def forward(self, data):
@@ -84,26 +32,44 @@ class GNN_plus(torch.nn.Module):
         hidden = torch.tanh(hidden)
         hidden = F.dropout(hidden, p=0.2)
 
-        # hidden = self.batchnorm(hidden)
-
-        # hidden = self.conv2(hidden, edge_index, edge_attr)
-        # hidden = torch.tanh(hidden)
-        # hidden = F.dropout(hidden, p=.2)
-
-        # hidden = self.batchnorm(hidden)
-
-        # hidden = self.conv3(hidden, edge_index, edge_attr)
-        # hidden = torch.tanh(hidden)
-        # hidden = F.dropout(hidden, p=.2)
-
-        # hidden = self.conv4(hidden, edge_index)
-        # hidden = torch.tanh(hidden)
-        # hidden = F.dropout(hidden, p=.2)
-
         # Global Pooling (stack different aggregations)
         hidden = torch.cat([gmp(hidden, batch_index), gap(hidden, batch_index)], dim=1)
 
-        # hidden = self.lin1(hidden)
+        out = self.out(hidden)
+
+        return out
+
+
+class GNN_plus(torch.nn.Module):
+    def __init__(self):
+        super(GNN_plus, self).__init__()
+        self.embedding_size = 8
+
+        self.initial_conv = GATConv(8, self.embedding_size)
+        self.conv1 = GATConv(self.embedding_size, self.embedding_size)
+
+        self.batchnorm = BatchNorm(self.embedding_size)
+
+        self.out = Linear(self.embedding_size * 2, 2145 * 2)
+
+    def forward(self, data):
+        x = data.x.float()
+        edge_index = data.edge_index
+        batch_index = data.batch
+        edge_attr = data.edge_attr
+
+        hidden = self.initial_conv(x, edge_index, edge_attr)
+        hidden = torch.tanh(hidden)
+        hidden = F.dropout(hidden, p=0.2)
+
+        hidden = self.batchnorm(hidden)
+
+        hidden = self.conv1(hidden, edge_index, edge_attr)
+        hidden = torch.tanh(hidden)
+        hidden = F.dropout(hidden, p=0.2)
+
+        # Global Pooling (stack different aggregations)
+        hidden = torch.cat([gmp(hidden, batch_index), gap(hidden, batch_index)], dim=1)
 
         out = self.out(hidden)
 
