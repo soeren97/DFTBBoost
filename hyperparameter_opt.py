@@ -12,54 +12,59 @@ from torchmetrics import MeanSquaredError as MSE
 from torchmetrics import MeanAbsoluteError as MAE
 from torchmetrics import MeanSquaredLogError as MSLE
 
-#optuna.logging.set_verbosity(optuna.logging.WARNING)
+# optuna.logging.set_verbosity(optuna.logging.WARNING)
+
 
 def hyperparameter_objective(trail: optuna.Trial, trainer: ModelTrainer) -> float:
-    trainer.model = GNN_plus().to(trainer.device)    
+    trainer.model = GNN_plus().to(trainer.device)
 
-    trainer.lr = trail.suggest_float('Learning_rate', 1e-6, 1e-3, log=True)
-    trainer.decay_rate = trail.suggest_float('Decay_rate', 1e-4, 0.1, step = 1e-4)
-    trainer.batch_size = 2**trail.suggest_int('Batch_size', 9, 12)
-    epsilon = trail.suggest_float('Epsilon', 1e-7, 1e-4)
+    trainer.lr = trail.suggest_float("Learning_rate", 1e-6, 1e-3, log=True)
+    trainer.decay_rate = trail.suggest_float("Decay_rate", 1e-4, 0.1, step=1e-4)
+    trainer.batch_size = 2 ** trail.suggest_int("Batch_size", 9, 12)
+    epsilon = trail.suggest_float("Epsilon", 1e-7, 1e-4)
     trainer.loss_fn = MSE()
     trainer.reset_patience = 20
     trainer.patience = 50
 
-    trainer.optimizer = torch.optim.Adam(trainer.model.parameters(), 
-                                    lr = trainer.lr, 
-                                    eps = epsilon,
-                                    weight_decay=trainer.decay_rate
-                                    )
+    trainer.optimizer = torch.optim.Adam(
+        trainer.model.parameters(),
+        lr=trainer.lr,
+        eps=epsilon,
+        weight_decay=trainer.decay_rate,
+    )
 
     loss = trainer.train_model()
 
     del trainer.model
 
-    return loss.iloc[0,-1]
+    return loss.iloc[0, -1]
+
 
 now = datetime.now().strftime("%y_%m_%d_%H%M%S")
 
 model_trainer = ModelTrainer()
 model_trainer.epochs = 100
-model_trainer.data_intervals = os.listdir('Data/datasets')
-model_trainer.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+model_trainer.data_intervals = os.listdir("Data/datasets")
+model_trainer.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model_trainer.model = GNN_plus().to(model_trainer.device)
 model_trainer.setup_data()
 
 pruner = optuna.pruners.SuccessiveHalvingPruner()
 
-#storage = optuna.storages.RDBStorage(f'/Optuna/studies/{now}.db')
+# storage = optuna.storages.RDBStorage(f'/Optuna/studies/{now}.db')
 storage = f"sqlite:///Optuna/studies/{now}.db"
 
-study = optuna.create_study(direction = 'minimize', 
-                            pruner=pruner,
-                            storage = storage,
-                            )
+study = optuna.create_study(
+    direction="minimize",
+    pruner=pruner,
+    storage=storage,
+)
 
-study.optimize(lambda trail: hyperparameter_objective(trail, model_trainer), 
-               n_trials=50, 
-               gc_after_trial = True
-               )
+study.optimize(
+    lambda trail: hyperparameter_objective(trail, model_trainer),
+    n_trials=50,
+    gc_after_trial=True,
+)
 
 # Get the best trial from the study
 best_trial = study.best_trial
@@ -68,5 +73,5 @@ best_trial = study.best_trial
 trial_dict = best_trial.params
 
 # Save the dictionary to a YAML file
-with open(f'Optuna/{now}.yaml', 'w+') as outfile:
+with open(f"Optuna/{now}.yaml", "w+") as outfile:
     yaml.dump(trial_dict, outfile, default_flow_style=False)

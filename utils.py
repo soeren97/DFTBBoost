@@ -8,29 +8,28 @@ from torch._utils import _accumulate
 import yaml
 
 from torch.utils.data.dataset import Subset, Dataset
-from typing import (
-                    Sequence,
-                    Union,
-                    Generator,
-                    List,
-                    Dict
-)
+from typing import Sequence, Union, Generator, List, Dict
+
 
 def load_config() -> Dict:
-    """Function to load in configuration file for model. 
-    Used to easily change variables such as learning rate, 
+    """Function to load in configuration file for model.
+    Used to easily change variables such as learning rate,
     loss function and such
-    """        
-    location = 'model_config/config.yaml'
-    with open(location, 'r') as file:
+    """
+    location = "model_config/config.yaml"
+    with open(location, "r") as file:
         config = yaml.safe_load(file)
     return config
 
-def random_split(dataset: Dataset[torch.Tensor], lengths: Sequence[Union[int,float]],
-                 generator: Generator = default_generator) -> List[Subset[torch.Tensor]]:
-    """As an older version of torch is used random split was not implimented. 
+
+def random_split(
+    dataset: Dataset[torch.Tensor],
+    lengths: Sequence[Union[int, float]],
+    generator: Generator = default_generator,
+) -> List[Subset[torch.Tensor]]:
+    """As an older version of torch is used random split was not implimented.
     This function is a copy of the currently implimented torch.utils.data.random_split().
-    """    
+    """
     if math.isclose(sum(lengths), 1) and sum(lengths) <= 1:
         subset_lengths: list[int] = []
         for i, frac in enumerate(lengths):
@@ -48,25 +47,36 @@ def random_split(dataset: Dataset[torch.Tensor], lengths: Sequence[Union[int,flo
         lengths = subset_lengths
         for i, length in enumerate(lengths):
             if length == 0:
-                warnings.warn(f"Length of split at index {i} is 0. "
-                            f"This might result in an empty dataset.")
+                warnings.warn(
+                    f"Length of split at index {i} is 0. "
+                    f"This might result in an empty dataset."
+                )
 
     # Cannot verify that dataset is Sized
-    if sum(lengths) != len(dataset):    # type: ignore[arg-type]
-        raise ValueError("Sum of input lengths does not equal the length of the input dataset!")
+    if sum(lengths) != len(dataset):  # type: ignore[arg-type]
+        raise ValueError(
+            "Sum of input lengths does not equal the length of the input dataset!"
+        )
 
     indices = randperm(sum(lengths), generator=generator).tolist()  # type: ignore[call-overload]
-    return [Subset(dataset, indices[offset - length : offset]) for offset, length in zip(_accumulate(lengths), lengths)]
+    return [
+        Subset(dataset, indices[offset - length : offset])
+        for offset, length in zip(_accumulate(lengths), lengths)
+    ]
+
 
 def convert_tril(tril_tensor: torch.Tensor) -> torch.Tensor:
-    tensor = torch.zeros(65, 65, dtype = torch.float32)
+    tensor = torch.zeros(65, 65, dtype=torch.float32)
     indices = torch.tril_indices(65, 65)
     tensor[indices[0], indices[1]] = tril_tensor.to(torch.float)
     idx = np.arange(tensor.shape[0])
-    tensor[idx,idx] = tensor[idx,idx]
+    tensor[idx, idx] = tensor[idx, idx]
     return tensor
-    
-def find_homo_lumo_pred(preds: List[torch.Tensor], n_electrons: List[int]) -> torch.Tensor:    
+
+
+def find_homo_lumo_pred(
+    preds: List[torch.Tensor], n_electrons: List[int]
+) -> torch.Tensor:
     n_electrons = torch.cat(n_electrons)
     # Convert tril tensors to full tensors
     hamiltonians = [convert_tril(pred[:2145]) for pred in preds]
@@ -79,7 +89,7 @@ def find_homo_lumo_pred(preds: List[torch.Tensor], n_electrons: List[int]) -> to
     eigenvalues = eigvalsh(overlaps.inverse() @ hamiltonians)
 
     # find index of HOMO
-    i = n_electrons // 2 # fix?
+    i = n_electrons // 2  # fix?
 
     # Select fifth eigenvalue above LUMO
     LUMO = eigenvalues[range(len(eigenvalues)), i + 6]
@@ -92,7 +102,10 @@ def find_homo_lumo_pred(preds: List[torch.Tensor], n_electrons: List[int]) -> to
 
     return torch.stack([HOMO, LUMO, gap], dim=1)
 
-def find_homo_lumo_true(hamiltonian: np.array, overlap: np.array, n_electrons: int) -> torch.Tensor:
+
+def find_homo_lumo_true(
+    hamiltonian: np.array, overlap: np.array, n_electrons: int
+) -> torch.Tensor:
     overlap = torch.tensor(overlap)
     hamiltonian = torch.tensor(hamiltonian)
 
@@ -100,7 +113,7 @@ def find_homo_lumo_true(hamiltonian: np.array, overlap: np.array, n_electrons: i
     eigenvalues = eigvalsh(overlap.inverse() @ hamiltonian)
 
     # find index of HOMO
-    i = n_electrons // 2 # fix?
+    i = n_electrons // 2  # fix?
 
     # Select fifth eigenvalue above LUMO
     LUMO = eigenvalues[i + 6]
