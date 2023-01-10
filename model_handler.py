@@ -21,7 +21,7 @@ from CostumDataset import CostumDataset
 
         
 class ModelTrainer():
-    def __init__(self):
+    def __init__(self) -> None:
         self.model = None
         self.device = None
         self.dataloader = None
@@ -52,7 +52,7 @@ class ModelTrainer():
         self.model_folder = None
         self.save_model = None
     
-    def setup_data(self):
+    def setup_data(self) -> None:
         model_name = self.model.__class__.__name__
         
         if model_name in ['GNN', 'GNN_plus']:
@@ -64,7 +64,7 @@ class ModelTrainer():
         
         self.train_set, self.test_set = utils.random_split(self.data, [.8,.2])
 
-    def evaluate_early_stopping(self, loss):
+    def evaluate_early_stopping(self, loss: torch.Tensor) -> None:
         if not self.best_loss >= loss:
             self.patience -= 1
         else:
@@ -74,7 +74,7 @@ class ModelTrainer():
         if self.patience == 0:
             self.early_stopping = True         
 
-    def train(self): 
+    def train(self) -> torch.Tensor: 
         self.model.train() 
         for batch in self.train_loader:
             self.optimizer.zero_grad() 
@@ -108,7 +108,7 @@ class ModelTrainer():
  
         return loss
     
-    def test(self):
+    def test(self) -> torch.Tensor:
         self.model.eval()
         for batch in self.test_loader:
             # Use GPU if available
@@ -137,7 +137,7 @@ class ModelTrainer():
             loss = self.loss_fn(pred, Y)   
         return loss
         
-    def train_model(self):
+    def train_model(self) -> pd.DataFrame:
         losses_train = []
         losses_test = []
         
@@ -194,7 +194,7 @@ class ModelTrainer():
                                 'Train_loss',
                                 'Test_loss'])
 
-    def main(self):
+    def main(self) -> None:
         self.config = utils.load_config()
         self.epochs = self.config['epochs']
         self.batch_size = int(self.config['batch_size'] / 32)

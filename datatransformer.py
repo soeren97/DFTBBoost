@@ -18,10 +18,15 @@ import networkx as nx
 
 import utils
 
+from typing import (
+                    Tuple,
+                    List
+)
+
 logging.getLogger('pysmiles').setLevel(logging.CRITICAL) # Anything higher than warning        
         
 class DataTransformer():
-    def __init__(self):
+    def __init__(self) -> None:
         self.device = None
         
         self.data_location = None
@@ -37,7 +42,7 @@ class DataTransformer():
         self.data_unpadded = None
         self.data = pd.DataFrame()        
 
-    def extract_data_dftb(self):    
+    def extract_data_dftb(self) -> None:    
         generator = os.walk(self.data_location_dftb)
         
         # skip first iteration of the generator
@@ -45,7 +50,7 @@ class DataTransformer():
         
         data_list = []
         
-        for root, dirs, files in tqdm(generator, 
+        for root, _, _ in tqdm(generator, 
                                       total = len(os.listdir(self.data_location_dftb)), 
                                       mininterval=.2,
                                       desc = 'Loading DFTB+ data'):
@@ -122,7 +127,7 @@ class DataTransformer():
         self.dftb_data.dropna(inplace = True)
         gc.collect()
        
-    def extract_data_g16(self):    
+    def extract_data_g16(self) -> None:    
         generator = os.walk(self.data_location_g16)
         
         # skip first iteration of the generator
@@ -136,7 +141,7 @@ class DataTransformer():
         except FileNotFoundError:
             data_list = []
         
-        for root, dirs, files in tqdm(generator, 
+        for root, _, _ in tqdm(generator, 
                                       total = len(os.listdir(self.data_location_g16)), 
                                       mininterval=.2,
                                       desc = 'Loading G16 data'):
@@ -227,7 +232,7 @@ class DataTransformer():
         gc.collect()
     
     def pad_and_tril(self, 
-                     array):
+                     array: np.array) -> Tuple([torch.Tensor, torch.Tensor]):
         tensor = torch.from_numpy(array)
         
         padding = self.max_dim - tensor.shape[0]
@@ -242,7 +247,7 @@ class DataTransformer():
         return tensor, tensor_padded
     
     def element_to_onehot(self, 
-                          element):
+                          element: List([str])):
         out = []
         for i in range(0, len(element)):
             v = np.zeros(len(self.elements))
@@ -251,15 +256,15 @@ class DataTransformer():
         return np.asarray(out)
 
     def pad_edge(self, 
-                 edge):
+                 edge: np.array) -> np.array:
         padding = 3 - len(edge)
         edge = np.pad(edge, ((0, padding), (0, 0)), constant_values = 0)
         
         return edge
     
     def remove_diagonal(self, 
-                        row, 
-                        diagonal):
+                        row: np.array, 
+                        diagonal: np.array) -> np.array:
         """Delete the diagonal element from the row
 
         Args:
@@ -273,10 +278,10 @@ class DataTransformer():
                          np.where(row == diagonal)[0])
 
     def extract_data_from_matrices(self, 
-                                   graph, 
-                                   hamiltonian, 
-                                   overlap, 
-                                   bond_attributes):
+                                   graph: GraphData, 
+                                   hamiltonian: torch.Tensor, 
+                                   overlap: torch.Tensor, 
+                                   bond_attributes) -> Tuple([List([np.array]), torch.Tensor, int]):
 
         atom_to_orbitals = {0: 1,
                             1: 4,
@@ -356,7 +361,7 @@ class DataTransformer():
         return nodes_ham_split, edge_list, n_electrons
         
 
-    def smiles2graph(self):
+    def smiles2graph(self) -> None:
         """Transforms smiles to graph
         https://github.com/pckroon/pysmiles
         https://sullyfchen.medium.com/predicting-drug-solubility-with-deep-learning-b5e48ff61206
@@ -529,7 +534,7 @@ class DataTransformer():
                 smiles = []
                 electron_list = []
    
-    def load_dftb(self):
+    def load_dftb(self) -> None:
         if os.path.exists('Data/dftb.pkl'):
             self.dftb_data = pd.read_pickle('Data/dftb.pkl')
         else:
@@ -537,10 +542,10 @@ class DataTransformer():
         
             self.dftb_data.to_pickle('Data/dftb.pkl')
             
-    def load_g16(self):
+    def load_g16(self) -> None:
         self.extract_data_g16()
            
-    def create_dataset(self):       
+    def create_dataset(self) -> None:       
         self.data_location = os.getcwd() + '/Data/'
         self.data_location_dftb = self.data_location + 'slurm_ready/'
         self.data_location_g16 = self.data_location + 'G16_zip/'
@@ -564,7 +569,7 @@ class DataTransformer():
 
         self.smiles2graph()
   
-def main():
+def main() -> None:
     datatransformer = DataTransformer()
     data_intervals = ['0-10000']
     for i in range(10001, 100001, 10000):

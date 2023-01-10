@@ -5,10 +5,18 @@ import warnings
 import math
 from torch import default_generator, randperm
 from torch._utils import _accumulate
-from torch.utils.data.dataset import Subset
 import yaml
 
-def load_config():
+from torch.utils.data.dataset import Subset, Dataset
+from typing import (
+                    Sequence,
+                    Union,
+                    Generator,
+                    List,
+                    Dict
+)
+
+def load_config() -> Dict:
     """Function to load in configuration file for model. 
     Used to easily change variables such as learning rate, 
     loss function and such
@@ -18,8 +26,8 @@ def load_config():
         config = yaml.safe_load(file)
     return config
 
-def random_split(dataset, lengths,
-                 generator=default_generator):
+def random_split(dataset: Dataset[torch.Tensor], lengths: Sequence[Union[int,float]],
+                 generator: Generator = default_generator) -> List[Subset[torch.Tensor]]:
     """As an older version of torch is used random split was not implimented. 
     This function is a copy of the currently implimented torch.utils.data.random_split().
     """    
@@ -50,7 +58,7 @@ def random_split(dataset, lengths,
     indices = randperm(sum(lengths), generator=generator).tolist()  # type: ignore[call-overload]
     return [Subset(dataset, indices[offset - length : offset]) for offset, length in zip(_accumulate(lengths), lengths)]
 
-def convert_tril(tril_tensor):
+def convert_tril(tril_tensor: torch.Tensor) -> torch.Tensor:
     tensor = torch.zeros(65, 65, dtype = torch.float32)
     indices = torch.tril_indices(65, 65)
     tensor[indices[0], indices[1]] = tril_tensor.to(torch.float)
@@ -58,7 +66,7 @@ def convert_tril(tril_tensor):
     tensor[idx,idx] = tensor[idx,idx]
     return tensor
     
-def find_homo_lumo_pred(preds, n_electrons):    
+def find_homo_lumo_pred(preds: List[torch.Tensor], n_electrons: List[int]) -> torch.Tensor:    
     n_electrons = torch.cat(n_electrons)
     # Convert tril tensors to full tensors
     hamiltonians = [convert_tril(pred[:2145]) for pred in preds]
@@ -84,7 +92,7 @@ def find_homo_lumo_pred(preds, n_electrons):
 
     return torch.stack([HOMO, LUMO, gap], dim=1)
 
-def find_homo_lumo_true(hamiltonian, overlap, n_electrons):
+def find_homo_lumo_true(hamiltonian: np.array, overlap: np.array, n_electrons: int) -> torch.Tensor:
     overlap = torch.tensor(overlap)
     hamiltonian = torch.tensor(hamiltonian)
 
