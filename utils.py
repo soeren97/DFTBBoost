@@ -51,17 +51,18 @@ def random_split(dataset, lengths,
     return [Subset(dataset, indices[offset - length : offset]) for offset, length in zip(_accumulate(lengths), lengths)]
 
 def convert_tril(tril_tensor):
-    tensor = torch.zeros(195, 195, dtype = torch.float32)
-    indices = torch.tril_indices(195, 195)
+    tensor = torch.zeros(65, 65, dtype = torch.float32)
+    indices = torch.tril_indices(65, 65)
     tensor[indices[0], indices[1]] = tril_tensor.to(torch.float)
     idx = np.arange(tensor.shape[0])
     tensor[idx,idx] = tensor[idx,idx]
     return tensor
-
-def find_homo_lumo_pred(preds):
+    
+def find_homo_lumo_pred(preds, n_electrons):    
+    n_electrons = torch.cat(n_electrons)
     # Convert tril tensors to full tensors
-    hamiltonians = [convert_tril(pred[:19110]) for pred in preds]
-    overlaps = [convert_tril(pred[19110:]).fill_diagonal_(1) for pred in preds]
+    hamiltonians = [convert_tril(pred[:2145]) for pred in preds]
+    overlaps = [convert_tril(pred[2145:]).fill_diagonal_(1) for pred in preds]
 
     overlaps = torch.stack(overlaps, dim=0)
     hamiltonians = torch.stack(hamiltonians, dim=0)
@@ -69,22 +70,20 @@ def find_homo_lumo_pred(preds):
     # Compute eigenvalues
     eigenvalues = eigvalsh(overlaps.inverse() @ hamiltonians)
 
-    first_positive_eigenvalue = [next((i for i, eigenvalue in enumerate(subtensor) if eigenvalue > 0), 0) for subtensor in eigenvalues]
-    first_negative_eigenvalue = [next((i for i, eigenvalue in enumerate(subtensor) if math.isclose(eigenvalue, 0, abs_tol = 10**-1)), 0) for subtensor in eigenvalues]
+    # find index of HOMO
+    i = n_electrons // 2 # fix?
 
-    LUMO_idx = torch.tensor(first_positive_eigenvalue) + 4
-    HOMO_idx = torch.tensor(first_negative_eigenvalue) - 4
+    # Select fifth eigenvalue above LUMO
+    LUMO = eigenvalues[range(len(eigenvalues)), i + 6]
 
-    HOMO = torch.nan_to_num(eigenvalues[range(eigenvalues.shape[0]), HOMO_idx.abs()])
-
-    # Select fifth eigenvalue above zero
-    LUMO = torch.nan_to_num(eigenvalues[range(eigenvalues.shape[0]), LUMO_idx.abs()])
+    # Select fifth eigenvalue bellow HOMO
+    HOMO = eigenvalues[range(len(eigenvalues)), i - 5]
 
     # Compute HOMO-LUMO gap
     gap = LUMO - HOMO
 
     return torch.stack([HOMO, LUMO, gap], dim=1)
-    
+
 def find_homo_lumo_true(hamiltonian, overlap, n_electrons):
     overlap = torch.tensor(overlap)
     hamiltonian = torch.tensor(hamiltonian)
@@ -93,13 +92,13 @@ def find_homo_lumo_true(hamiltonian, overlap, n_electrons):
     eigenvalues = eigvalsh(overlap.inverse() @ hamiltonian)
 
     # find index of HOMO
-    i = n_electrons // 2 # fix
+    i = n_electrons // 2 # fix?
 
-    # Select fifth eigenvalue bellow zero
-    HOMO = eigenvalues[i + 5]
+    # Select fifth eigenvalue above LUMO
+    LUMO = eigenvalues[i + 6]
 
-    # Select fifth eigenvalue above zero
-    LUMO = eigenvalues[i - 6]
+    # Select fifth eigenvalue bellow HOMO
+    HOMO = eigenvalues[i - 5]
 
     # Compute HOMO-LUMO gap
     gap = LUMO - HOMO

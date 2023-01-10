@@ -19,7 +19,7 @@ class CostumDataset(Dataset):
         data = pd.read_pickle(self.file_names[index])
         
         if self.ml_method in ['GNN', 'GNN_plus']:
-            return data['SMILES'].tolist(), data[self.ml_method].tolist()
+            return data['N_electrons'].tolist(), data[self.ml_method].tolist()
         
         else:
             data_list = torch.tensor(data[self.ml_method])

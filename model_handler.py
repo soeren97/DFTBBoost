@@ -74,50 +74,63 @@ class ModelTrainer():
         if self.patience == 0:
             self.early_stopping = True         
 
-    def train(self):  
+    def train(self): 
+        self.model.train() 
         for batch in self.train_loader:
             self.optimizer.zero_grad() 
 
             if self.model.__class__.__name__ in ['GNN', 'GNN_plus']:
-                
-                smiles, data = batch[0], Batch.from_data_list(batch[1])
+
+                n_electrons, data = batch[0], Batch.from_data_list(batch[1])
 
                 data.to(self.device)  
                 
-                pred = self.model(data)
+                preds = self.model(data)
                 
                 Y = data.y.reshape(-1, 3)
                 
             else:
+                n_electrons, data = batch[0], batch[1]
                 X = data['x'].to(self.device)
                 Y = data['y'].to(self.device)
                 
-                pred = self.model(X.float())
+                preds = self.model(X.float())
             
             # Calculate HOMO, LUMO and gap
-            pred = utils.find_homo_lumo(pred)
+            pred = utils.find_homo_lumo_pred(preds, n_electrons)
             
             loss = self.loss_fn(pred, Y)
             
             loss.backward()  
             
             # Update using the gradients
-
             self.optimizer.step()
  
         return loss
     
     def test(self):
-        for data in self.test_loader:
+        self.model.eval()
+        for batch in self.test_loader:
             # Use GPU if available
-            data.to(self.device)  
+            if self.model.__class__.__name__ in ['GNN', 'GNN_plus']:
 
-            # Reset gradients
-            self.optimizer.zero_grad() 
+                n_electrons, data = batch[0], Batch.from_data_list(batch[1])
+
+                data.to(self.device)  
+                
+                preds = self.model(data)
+                
+                Y = data.y.reshape(-1, 3)
+                
+            else:
+                n_electrons, data = batch[0], batch[1]
+                X = data['x'].to(self.device)
+                Y = data['y'].to(self.device)
+                
+                preds = self.model(X.float())
             
-            pred = self.model(data)
-            
-            pred = utils.find_homo_lumo(pred)
+            # Calculate HOMO, LUMO and gap
+            pred = utils.find_homo_lumo_pred(preds, n_electrons)
             Y = data.y.reshape(-1, 3)
             
             # Calculating the loss and gradients

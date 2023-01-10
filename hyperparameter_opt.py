@@ -14,17 +14,16 @@ from torchmetrics import MeanSquaredLogError as MSLE
 
 #optuna.logging.set_verbosity(optuna.logging.WARNING)
 
-def hyperparameter_objective(trail, trainer):
+def hyperparameter_objective(trail: optuna.Trial, trainer: ModelTrainer) -> float:
     trainer.model = GNN_plus().to(trainer.device)    
 
     trainer.lr = trail.suggest_float('Learning_rate', 1e-6, 1e-3, log=True)
     trainer.decay_rate = trail.suggest_float('Decay_rate', 1e-4, 0.1, step = 1e-4)
-    trainer.batch_size = 2**trail.suggest_int('Batch_size', 7, 8)
+    trainer.batch_size = 2**trail.suggest_int('Batch_size', 9, 12)
     epsilon = trail.suggest_float('Epsilon', 1e-7, 1e-4)
-    trainer.loss_fn = MSLE()
+    trainer.loss_fn = MSE()
     trainer.reset_patience = 20
-
-    print(trainer.batch_size)
+    trainer.patience = 50
 
     trainer.optimizer = torch.optim.Adam(trainer.model.parameters(), 
                                     lr = trainer.lr, 
@@ -47,13 +46,13 @@ model_trainer.device = torch.device('cuda' if torch.cuda.is_available() else 'cp
 model_trainer.model = GNN_plus().to(model_trainer.device)
 model_trainer.setup_data()
 
-#pruner = optuna.pruners.SuccessiveHalvingPruner()
+pruner = optuna.pruners.SuccessiveHalvingPruner()
 
 #storage = optuna.storages.RDBStorage(f'/Optuna/studies/{now}.db')
 storage = f"sqlite:///Optuna/studies/{now}.db"
 
 study = optuna.create_study(direction = 'minimize', 
-                            #pruner=pruner,
+                            pruner=pruner,
                             storage = storage,
                             )
 

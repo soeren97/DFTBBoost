@@ -293,7 +293,8 @@ class DataTransformer():
         bond_to_orbitals = {0: 1,
                             1: 1,
                             2: 2,
-                            3: 3}
+                            3: 3,
+                            12: 2}
 
         atoms = graph.x[:,0].clone()
 
@@ -375,6 +376,7 @@ class DataTransformer():
         CNN_data = []
         NN_data = []
         smiles = []
+        electron_list = []
 
         for index, data in tqdm(generator,
                                 total = end, 
@@ -382,6 +384,7 @@ class DataTransformer():
                                 desc = 'Saving datasets'):
             
             smile, xyz = data['SMILES'], data['Coordinates']
+
             hamiltonian_dftb, hamdftb_pad = self.pad_and_tril(data['Hamiltonian'])
             overlap_dftb, overdftb_pad = self.pad_and_tril(data['Overlap'])
             hamiltonian_g16, hamg16_pad = self.pad_and_tril(data['Hamiltonian_g16'])
@@ -412,7 +415,6 @@ class DataTransformer():
             # This function includes what type of bond connects two nodes and is used as edge_attr
             bond_attributes = from_smiles(smile, with_hydrogen=True).edge_attr
 
-        
             nx.set_node_attributes(graph, {
                 k: {
                     'x' : [feature[k], 
@@ -439,19 +441,18 @@ class DataTransformer():
             num_nodes = graph.num_nodes
 
             data_graph.num_nodes = num_nodes
-            
+
+            nodes_ham, edge_attributes, n_electrons = self.extract_data_from_matrices(graph, 
+                                                                        hamdftb_pad, 
+                                                                        overdftb_pad,
+                                                                        edge_attributes
+                                                                        )
+
             try:
-                nodes_ham, edge_attributes, n_electrons = self.extract_data_from_matrices(graph, 
-                                                                            hamdftb_pad, 
-                                                                            overdftb_pad,
-                                                                            edge_attributes
-                                                                            )
-
+                Y_HOMO_LUMO = utils.find_homo_lumo(data['Hamiltonian_g16'], data['Overlap_g16'], n_electrons)
             except:
-                print(f'{smile} failed')
+                print(f'Molecule {smile} failed')
                 continue
-
-            Y_HOMO_LUMO = utils.find_homo_lumo_true(data['Hamiltonian_g16'], data['Overlap_g16'], n_electrons)
 
             data_graph.y = Y_HOMO_LUMO
 
@@ -490,30 +491,34 @@ class DataTransformer():
             CNN_data.append([CNN_X, CNN_Y, Y_HOMO_LUMO])
             
             NN_data.append([NN_X, Y, Y_HOMO_LUMO])
+
+            electron_list.append(n_electrons)
                     
             if (index % 32 == 0 and index != 0) or index == end-1:
                 file_name = self.data_interval + '_' + str(index - 31) + '-' + str(index - 1) + '.pkl'
 
-                NN = {'SMILES': smiles, 'NN': NN_data}
+                try:
+                    NN = {'SMILES': smiles, 'NN': NN_data, 'N_electrons': electron_list}
+                except:
+                    pass
 
                 NN_data = pd.DataFrame(NN)
 
                 #NN_data.to_pickle(save_location + 'NN/'+ file_name)
                 
-                CNN = {'SMILES': smiles, 'CNN': CNN_data}
+                CNN = {'SMILES': smiles, 'CNN': CNN_data, 'N_electrons': electron_list}
                 
                 CNN_data = pd.DataFrame(CNN)
 
                 #CNN_data.to_pickle(save_location + 'CNN/'+ file_name)
                 
-                GNN = {'SMILES': smiles, 'GNN': GNN_data}
+                GNN = {'SMILES': smiles, 'GNN': GNN_data, 'N_electrons': electron_list}
                 
                 GNN_data = pd.DataFrame(GNN)
 
                 GNN_data.to_pickle(save_location + 'GNN/'+ file_name)
                 
-                
-                GNN_plus = {'SMILES': smiles, 'GNN_plus': GNNplus_data}
+                GNN_plus = {'SMILES': smiles, 'GNN_plus': GNNplus_data, 'N_electrons': electron_list}
                 GNNplus_data = pd.DataFrame(GNN_plus)
                 GNNplus_data.to_pickle(save_location + 'GNN_plus/'+ file_name)
             
@@ -522,6 +527,7 @@ class DataTransformer():
                 CNN_data = []
                 NN_data = []
                 smiles = []
+                electron_list = []
    
     def load_dftb(self):
         if os.path.exists('Data/dftb.pkl'):
