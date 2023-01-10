@@ -28,7 +28,7 @@ class Plotter:
         plt.plot(loss_test[1:], label="Test")
         plt.legend()
         plt.xlabel("Epoch")
-        plt.ylabel("Loss")
+        plt.ylabel("Loss (MSE)")
         plt.tight_layout()
         # plt.ylim(top = 7)
         # plt.yscale('log')
