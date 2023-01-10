@@ -3,43 +3,40 @@ from torch.nn import Linear, Dropout2d, Conv2d  # , conv_transpose2d
 import torch.nn.functional as F
 
 from torch_geometric.nn import global_mean_pool as gap, global_max_pool as gmp
-from torch_geometric.nn import GCNConv, GATConv, BatchNorm
+from torch_geometric.nn import GATConv, BatchNorm
 
 
 class GNN(torch.nn.Module):
     def __init__(self):
         super(GNN, self).__init__()
-        self.embedding_size = 128
+        self.embedding_size = 16
 
-        self.initial_conv = GCNConv(4, self.embedding_size)
-        self.conv1 = GCNConv(self.embedding_size, self.embedding_size)
-        self.conv2 = GCNConv(self.embedding_size, self.embedding_size)
-        self.conv3 = GCNConv(self.embedding_size, self.embedding_size)
-        # self.conv4 = GCNConv(self.embedding_size, self.embedding_size)
-
-        self.lin1 = Linear(self.embedding_size * 2, self.embedding_size * 4)
-        self.out = Linear(self.embedding_size * 4, 2145 * 2)
+        self.initial_conv = GATConv(4, self.embedding_size)
+        self.conv1 = GATConv(self.embedding_size, self.embedding_size)
 
     def forward(self, data):
         x = data.x.float()
         edge_index = data.edge_index
         batch_index = data.batch
+        edge_attr = data.edge_attr
 
-        hidden = self.initial_conv(x, edge_index)
+        hidden = self.initial_conv(x, edge_index, edge_attr)
         hidden = torch.tanh(hidden)
         hidden = F.dropout(hidden, p=0.2)
 
-        hidden = self.conv1(hidden, edge_index)
+        hidden = self.batchnorm(hidden)
+
+        hidden = self.conv1(hidden, edge_index, edge_attr)
         hidden = torch.tanh(hidden)
         hidden = F.dropout(hidden, p=0.2)
 
-        hidden = self.conv2(hidden, edge_index)
-        hidden = torch.tanh(hidden)
-        hidden = F.dropout(hidden, p=0.2)
+        # hidden = self.conv2(hidden, edge_index)
+        # hidden = torch.tanh(hidden)
+        # hidden = F.dropout(hidden, p=0.2)
 
-        hidden = self.conv3(hidden, edge_index)
-        hidden = torch.tanh(hidden)
-        hidden = F.dropout(hidden, p=0.2)
+        # hidden = self.conv3(hidden, edge_index)
+        # hidden = torch.tanh(hidden)
+        # hidden = F.dropout(hidden, p=0.2)
 
         # hidden = self.conv4(hidden, edge_index)
         # hidden = torch.tanh(hidden)
