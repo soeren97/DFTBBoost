@@ -25,6 +25,7 @@ def hyperparameter_objective(trail: optuna.Trial, trainer: ModelTrainer) -> floa
     trainer.loss_fn = MSE()
     trainer.reset_patience = 20
     trainer.patience = 50
+    trainer.early_stopping = False
 
     trainer.optimizer = torch.optim.Adam(
         trainer.model.parameters(),
