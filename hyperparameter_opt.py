@@ -23,7 +23,7 @@ def hyperparameter_objective(trail: optuna.Trial, trainer: ModelTrainer) -> floa
     trainer.batch_size = 2 ** trail.suggest_int("Batch_size", 9, 12)
     epsilon = trail.suggest_float("Epsilon", 1e-7, 1e-4)
     trainer.loss_fn = MSE()
-    trainer.reset_patience = 20
+    trainer.reset_patience = 10
     trainer.patience = 50
     trainer.early_stopping = False
 
