@@ -85,17 +85,19 @@ class CNN(torch.nn.Module):  # fix dimensions
 
         self.dropout = Dropout2d(p=0.2)
 
-        # =============================================================================
-        #          self.initial_conv = Conv2d([batch_size,
-        #                                     390,
-        #                                     195,
-        #                                      ],
-        #                                     [batch_size,
-        #                                      386,
-        #                                      191,
-        #                                      ],
-        #                                     kernel_size = self.kernel_size)
-        # =============================================================================
+        # self.initial_conv = Conv2d(
+        #     [
+        #         batch_size,
+        #         390,
+        #         195,
+        #     ],
+        #     [
+        #         batch_size,
+        #         386,
+        #         191,
+        #     ],
+        #     kernel_size=self.kernel_size,
+        # )
 
         self.initial_conv = Conv2d(
             batch_size,
@@ -111,19 +113,19 @@ class CNN(torch.nn.Module):  # fix dimensions
             kernel_size=self.kernel_size,
         )
 
-        self.conv2 = Conv2d(
-            batch_size,
-            self.embedding_size * 2,
-            self.embedding_size * 4,
-            kernel_size=self.kernel_size,
-        )
+        # self.conv2 = Conv2d(
+        #     batch_size,
+        #     self.embedding_size * 2,
+        #     self.embedding_size * 4,
+        #     kernel_size=self.kernel_size,
+        # )
 
-        self.conv3 = Conv2d(
-            batch_size,
-            self.embedding_size * 4,
-            self.embedding_size * 2,
-            kernel_size=self.kernel_size,
-        )
+        # self.conv3 = Conv2d(
+        #     batch_size,
+        #     self.embedding_size * 4,
+        #     self.embedding_size * 2,
+        #     kernel_size=self.kernel_size,
+        # )
 
         # self.unconv1 = conv_transpose2d()
 
@@ -169,13 +171,13 @@ class NN(torch.nn.Module):
         super(NN, self).__init__()
         self.embedding_size = 64
 
-        self.initial = Linear(self.embedding_size, self.embedding_size)
+        self.initial = Linear(2145 * 2, self.embedding_size)
         self.lin1 = Linear(self.embedding_size, self.embedding_size * 2)
         self.lin2 = Linear(self.embedding_size * 2, self.embedding_size * 4)
         self.out = Linear(self.embedding_size * 4, 2145 * 2)
 
     def forward(self, x):
-        hidden = self.initial_conv(x)
+        hidden = self.initial(x)
         hidden = torch.tanh(hidden)
         hidden = F.dropout(hidden, p=0.2)
 
@@ -186,12 +188,6 @@ class NN(torch.nn.Module):
         hidden = self.lin2(hidden)
         hidden = torch.tanh(hidden)
         hidden = F.dropout(hidden, p=0.2)
-
-        # Global Pooling (stack different aggregations)
-        # hidden = torch.cat([gmp(hidden, batch_index),
-        #                    gap(hidden, batch_index)], dim=1)
-
-        hidden = self.lin1(hidden)
 
         out = self.out(hidden)
 

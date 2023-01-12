@@ -24,11 +24,12 @@ class CostumDataset(Dataset):
             return data["N_electrons"].tolist(), data[self.ml_method].tolist()
 
         else:
-            data_list = torch.tensor(data[self.ml_method])
-            X, Y = torch.stack(data_list, dim=0)
+            X = data[f"{self.ml_method}_X"].tolist()
 
-            # X = torch.tensor(data_list[0],
-            #                  requires_grad = True)
-            # Y = torch.tensor(data_list[1],
-            #                  requires_grad = True)
-            return X, Y
+            Y = data[f"{self.ml_method}_Y"].tolist()
+
+            N_electrons = data["N_electrons"].tolist()
+
+            energies = data["Energies"].tolist()
+
+            return X, Y, N_electrons, energies

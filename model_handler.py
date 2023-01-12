@@ -87,19 +87,26 @@ class ModelTrainer:
 
                 preds = self.model(data)
 
-                Y = data.y.reshape(-1, 3)
+                energies = data.y.reshape(-1, 3)
 
             else:
-                n_electrons, data = batch[0], batch[1]
-                X = data["x"].to(self.device)
-                Y = data["y"].to(self.device)
+                X, Y, n_electrons, energies = batch[0], batch[1], batch[2], batch[3]
+
+                X.to(self.device)
+                Y.to(self.device)
+                n_electrons.to(self.device)
+                energies.to(self.device)
 
                 preds = self.model(X.float())
 
-            # Calculate HOMO, LUMO and gap
-            pred = utils.find_homo_lumo_pred(preds, n_electrons)
+            if self.model.__class__.__name__ == "CNN":
+                loss = self.loss_fn(pred, Y)
 
-            loss = self.loss_fn(pred, Y)
+            else:
+                # Calculate HOMO, LUMO and gap
+                pred = utils.find_homo_lumo_pred(preds, n_electrons)
+
+                loss = self.loss_fn(pred, energies)
 
             loss.backward()
 
@@ -120,21 +127,27 @@ class ModelTrainer:
 
                 preds = self.model(data)
 
-                Y = data.y.reshape(-1, 3)
+                energies = data.y.reshape(-1, 3)
 
             else:
-                n_electrons, data = batch[0], batch[1]
-                X = data["x"].to(self.device)
-                Y = data["y"].to(self.device)
+                X, Y, n_electrons, energies = batch[0], batch[1], batch[2], batch[3]
+
+                X.to(self.device)
+                Y.to(self.device)
+                n_electrons.to(self.device)
+                energies.to(self.device)
 
                 preds = self.model(X.float())
 
-            # Calculate HOMO, LUMO and gap
-            pred = utils.find_homo_lumo_pred(preds, n_electrons)
-            Y = data.y.reshape(-1, 3)
+            if self.model.__class__.__name__ == "CNN":
+                loss = self.loss_fn(pred, Y)
 
-            # Calculating the loss and gradients
-            loss = self.loss_fn(pred, Y)
+            else:
+                # Calculate HOMO, LUMO and gap
+                pred = utils.find_homo_lumo_pred(preds, n_electrons)
+
+                loss = self.loss_fn(pred, energies)
+
         return loss
 
     def train_model(self) -> pd.DataFrame:
@@ -145,10 +158,14 @@ class ModelTrainer:
             self.train_set,
             batch_size=self.batch_size,
             shuffle=True,
+            collate_fn=utils.costume_collate,
         )
 
         self.test_loader = self.loader(
-            self.test_set, batch_size=self.batch_size, shuffle=True
+            self.test_set,
+            batch_size=self.batch_size,
+            shuffle=True,
+            collate_fn=utils.costume_collate,
         )
 
         for epoch in (

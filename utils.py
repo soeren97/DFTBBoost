@@ -77,7 +77,11 @@ def convert_tril(tril_tensor: torch.Tensor) -> torch.Tensor:
 def find_homo_lumo_pred(
     preds: List[torch.Tensor], n_electrons: List[int]
 ) -> torch.Tensor:
-    n_electrons = torch.cat(n_electrons)
+    if type(n_electrons) == torch.Tensor:
+        pass
+    else:
+        n_electrons = torch.cat(n_electrons)
+
     # Convert tril tensors to full tensors
     hamiltonians = [convert_tril(pred[:2145]) for pred in preds]
     overlaps = [convert_tril(pred[2145:]).fill_diagonal_(1) for pred in preds]
@@ -125,3 +129,14 @@ def find_homo_lumo_true(
     gap = LUMO - HOMO
 
     return torch.stack([HOMO, LUMO, gap])
+
+
+def costume_collate(batch):
+    X = torch.stack([tensor for entry in batch for tensor in entry[0]], dim=0)
+    Y = torch.stack([tensor for entry in batch for tensor in entry[1]], dim=0)
+    n_electrons = torch.stack(
+        [torch.tensor(integer) for entry in batch for integer in entry[2]], dim=0
+    )
+    energies = torch.stack([tensor for entry in batch for tensor in entry[3]], dim=0)
+
+    return X, Y, n_electrons, energies

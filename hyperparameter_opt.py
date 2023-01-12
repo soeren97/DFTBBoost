@@ -47,8 +47,10 @@ model_trainer = ModelTrainer()
 model_trainer.epochs = 100
 model_trainer.data_intervals = os.listdir("Data/datasets")
 model_trainer.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-model_trainer.model = GNN_plus().to(model_trainer.device)
+model_trainer.model = GNN().to(model_trainer.device)
 model_trainer.setup_data()
+
+model_name = (model_trainer.model.__class__.__name__,)
 
 pruner = optuna.pruners.SuccessiveHalvingPruner()
 
@@ -56,9 +58,7 @@ pruner = optuna.pruners.SuccessiveHalvingPruner()
 storage = f"sqlite:///Optuna/studies/{now}.db"
 
 study = optuna.create_study(
-    direction="minimize",
-    pruner=pruner,
-    storage=storage,
+    direction="minimize", pruner=pruner, storage=storage, study_name=model_name
 )
 
 study.optimize(
@@ -74,5 +74,5 @@ best_trial = study.best_trial
 trial_dict = best_trial.params
 
 # Save the dictionary to a YAML file
-with open(f"Optuna/{now}.yaml", "w+") as outfile:
+with open(f"Optuna/{model_name + now}.yaml", "w+") as outfile:
     yaml.dump(trial_dict, outfile, default_flow_style=False)

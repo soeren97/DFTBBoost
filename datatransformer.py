@@ -231,7 +231,7 @@ class DataTransformer:
 
         gc.collect()
 
-    def pad_and_tril(self, array: np.array) -> Tuple([torch.Tensor, torch.Tensor]):
+    def pad_and_tril(self, array: np.array) -> Tuple[torch.Tensor, torch.Tensor]:
         tensor = torch.from_numpy(array)
 
         padding = self.max_dim - tensor.shape[0]
@@ -245,7 +245,7 @@ class DataTransformer:
 
         return tensor, tensor_padded
 
-    def element_to_onehot(self, element: List([str])):
+    def element_to_onehot(self, element: List[str]):
         out = []
         for i in range(0, len(element)):
             v = np.zeros(len(self.elements))
@@ -277,7 +277,7 @@ class DataTransformer:
         hamiltonian: torch.Tensor,
         overlap: torch.Tensor,
         bond_attributes,
-    ) -> Tuple([List([np.array]), torch.Tensor, int]):
+    ) -> Tuple[List[np.array], torch.Tensor, int]:
 
         atom_to_orbitals = {0: 1, 1: 4, 2: 4, 3: 4, 4: 4}
 
@@ -360,10 +360,13 @@ class DataTransformer:
 
         GNN_data = []
         GNNplus_data = []
-        CNN_data = []
-        NN_data = []
+        CNN_X_list = []
+        CNN_Y_list = []
+        NN_X_list = []
+        NN_Y_list = []
         smiles = []
         electron_list = []
+        energies = []
 
         for index, data in tqdm(
             generator, total=end, mininterval=0.2, desc="Saving datasets"
@@ -379,13 +382,13 @@ class DataTransformer:
             if None in [hamiltonian_dftb, overlap_dftb, hamiltonian_g16, overlap_g16]:
                 continue
 
-            NN_X = torch.cat((hamiltonian_dftb, overlap_dftb))
+            NN_X = torch.concat((hamiltonian_dftb, overlap_dftb))
 
-            Y = torch.cat((hamiltonian_g16, overlap_g16))
+            Y = torch.concat((hamiltonian_g16, overlap_g16))
 
-            CNN_X = torch.cat((hamdftb_pad, overdftb_pad))
+            CNN_X = torch.stack((hamdftb_pad, overdftb_pad))
 
-            CNN_Y = torch.cat((hamg16_pad, overg16_pad))
+            CNN_Y = torch.stack((hamg16_pad, overg16_pad))
 
             coord = xyz[:, 1:].astype("float64")
 
@@ -430,7 +433,7 @@ class DataTransformer:
             )
 
             try:
-                Y_HOMO_LUMO = utils.find_homo_lumo(
+                Y_HOMO_LUMO = utils.find_homo_lumo_true(
                     data["Hamiltonian_g16"], data["Overlap_g16"], n_electrons
                 )
             except:
@@ -479,36 +482,51 @@ class DataTransformer:
 
             GNNplus_data.append(data_graph_plus)
 
-            CNN_data.append([CNN_X, CNN_Y, Y_HOMO_LUMO])
+            CNN_X_list.append(CNN_X)
 
-            NN_data.append([NN_X, Y, Y_HOMO_LUMO])
+            CNN_Y_list.append(CNN_Y)
+
+            NN_X_list.append(NN_X)
+
+            NN_Y_list.append(Y)
 
             electron_list.append(n_electrons)
+
+            energies.append(Y_HOMO_LUMO)
 
             if (index % 32 == 0 and index != 0) or index == end - 1:
                 file_name = (
                     self.data_interval
                     + "_"
-                    + str(index - 31)
+                    + str(index - 32)
                     + "-"
                     + str(index - 1)
                     + ".pkl"
                 )
 
-                try:
-                    NN = {"SMILES": smiles, "NN": NN_data, "N_electrons": electron_list}
-                except:
-                    pass
+                NN = {
+                    "SMILES": smiles,
+                    "NN_X": NN_X_list,
+                    "NN_Y": NN_Y_list,
+                    "N_electrons": electron_list,
+                    "Energies": energies,
+                }
 
                 NN_data = pd.DataFrame(NN)
 
-                # NN_data.to_pickle(save_location + 'NN/'+ file_name)
+                NN_data.to_pickle(save_location + "NN/" + file_name)
 
-                CNN = {"SMILES": smiles, "CNN": CNN_data, "N_electrons": electron_list}
+                CNN = {
+                    "SMILES": smiles,
+                    "CNN_X": CNN_X_list,
+                    "CNN_Y": CNN_Y_list,
+                    "N_electrons": electron_list,
+                    "Energies": energies,
+                }
 
                 CNN_data = pd.DataFrame(CNN)
 
-                # CNN_data.to_pickle(save_location + 'CNN/'+ file_name)
+                CNN_data.to_pickle(save_location + "CNN/" + file_name)
 
                 GNN = {"SMILES": smiles, "GNN": GNN_data, "N_electrons": electron_list}
 
@@ -526,10 +544,13 @@ class DataTransformer:
 
                 GNN_data = []
                 GNNplus_data = []
-                CNN_data = []
-                NN_data = []
+                CNN_X_list = []
+                CNN_Y_list = []
+                NN_X_list = []
+                NN_Y_list = []
                 smiles = []
                 electron_list = []
+                energies = []
 
     def load_dftb(self) -> None:
         if os.path.exists("Data/dftb.pkl"):

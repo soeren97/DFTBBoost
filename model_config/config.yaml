@@ -4,4 +4,4 @@ loss_fn: MSE
 epochs: 100
 batch_size: 2048
 start_patience: 10
-model: GNN_plus
+model: NN
