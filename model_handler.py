@@ -100,7 +100,7 @@ class ModelTrainer:
                 preds = self.model(X.float())
 
             if self.model.__class__.__name__ == "CNN":
-                loss = self.loss_fn(pred, Y)
+                loss = self.loss_fn(preds, Y)
 
             else:
                 # Calculate HOMO, LUMO and gap
@@ -140,7 +140,7 @@ class ModelTrainer:
                 preds = self.model(X.float())
 
             if self.model.__class__.__name__ == "CNN":
-                loss = self.loss_fn(pred, Y)
+                loss = self.loss_fn(preds, Y)
 
             else:
                 # Calculate HOMO, LUMO and gap
