@@ -1,5 +1,6 @@
 import torch
 import numpy as np
+import pandas as pd
 from torch.linalg import eigvalsh
 import warnings
 import math
@@ -129,6 +130,20 @@ def find_homo_lumo_true(
     gap = LUMO - HOMO
 
     return torch.stack([HOMO, LUMO, gap])
+
+
+def find_eigenvalues(preds: pd.DataFrame) -> torch.Tensor:
+    # Convert tril tensors to full tensors
+    hamiltonians = [convert_tril(pred[:2145]) for pred in preds]
+    overlaps = [convert_tril(pred[2145:]).fill_diagonal_(1) for pred in preds]
+
+    overlaps = torch.stack(overlaps, dim=0)
+    hamiltonians = torch.stack(hamiltonians, dim=0)
+
+    # Compute eigenvalues
+    eigenvalues = eigvalsh(overlaps.inverse() @ hamiltonians)
+
+    return eigenvalues
 
 
 def costume_collate(batch):
