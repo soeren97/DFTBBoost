@@ -104,9 +104,9 @@ class ModelTrainer:
 
             else:
                 # Calculate HOMO, LUMO and gap
-                pred = utils.find_homo_lumo_pred(preds, n_electrons)
+                preds = utils.find_homo_lumo_pred(preds, n_electrons)
 
-                loss = self.loss_fn(pred, energies)
+                loss = self.loss_fn(preds, energies)
 
             loss.backward()
 

@@ -16,7 +16,7 @@ from torchmetrics import MeanSquaredLogError as MSLE
 
 
 def hyperparameter_objective(trail: optuna.Trial, trainer: ModelTrainer) -> float:
-    trainer.model = GNN_plus().to(trainer.device)
+    trainer.model = GNN().to(trainer.device)
 
     trainer.lr = trail.suggest_float("Learning_rate", 1e-9, 1e-5, log=True)
     trainer.decay_rate = trail.suggest_float("Decay_rate", 1e-4, 0.1, step=1e-4)

@@ -1,5 +1,5 @@
 import torch
-from torch.nn import Linear, Dropout2d, Conv2d, MaxPool2d, Module, ConvTranspose2d
+from torch.nn import Linear, Dropout2d, Conv2d, Module
 import torch.nn.functional as F
 
 from torch_geometric.nn import global_mean_pool as gap, global_max_pool as gmp
