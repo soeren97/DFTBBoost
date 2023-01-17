@@ -39,6 +39,7 @@ class ModelTrainer:
 
         self.train_loader = None
         self.test_loader = None
+        self.data_loader = None
 
         self.optimizer = None
 
