@@ -12,13 +12,15 @@ from torch.utils.data.dataset import Subset, Dataset
 from typing import Sequence, Union, Generator, List, Dict
 
 
-def load_config() -> Dict:
+def load_config(path: str = None) -> Dict:
     """Function to load in configuration file for model.
     Used to easily change variables such as learning rate,
     loss function and such
     """
-    location = "model_config/config.yaml"
-    with open(location, "r") as file:
+    if path == None:
+        path = "model_config/config.yaml"
+
+    with open(path, "r") as file:
         config = yaml.safe_load(file)
     return config
 
@@ -132,7 +134,9 @@ def find_homo_lumo_true(
     return torch.stack([HOMO, LUMO, gap])
 
 
-def find_eigenvalues(preds: pd.DataFrame) -> torch.Tensor:
+def find_eigenvalues(preds: pd.DataFrame, n_electrons: List[int]) -> torch.Tensor:
+    n_electrons = torch.tensor(n_electrons)
+
     # Convert tril tensors to full tensors
     hamiltonians = [convert_tril(pred[:2145]) for pred in preds]
     overlaps = [convert_tril(pred[2145:]).fill_diagonal_(1) for pred in preds]
@@ -143,7 +147,16 @@ def find_eigenvalues(preds: pd.DataFrame) -> torch.Tensor:
     # Compute eigenvalues
     eigenvalues = eigvalsh(overlaps.inverse() @ hamiltonians)
 
-    return eigenvalues
+    # find index of HOMO
+    i = n_electrons // 2  # fix?
+
+    # Select fifth eigenvalue above LUMO
+    LUMO = eigenvalues[range(len(eigenvalues)), i + 6]
+
+    # Select fifth eigenvalue bellow HOMO
+    HOMO = eigenvalues[range(len(eigenvalues)), i - 5]
+
+    return eigenvalues, HOMO, LUMO
 
 
 def costume_collate(batch):

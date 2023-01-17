@@ -1,8 +1,9 @@
 import os
 import matplotlib.pyplot as plt
 import seaborn as sns
-
 import pandas as pd
+
+from utils import load_config
 
 sns.set_theme()
 
@@ -11,6 +12,7 @@ class Plotter:
     def __init__(self) -> None:
         self.path = None
         self.save = False
+        self.goal_line = None
 
     def load_model_data(self) -> pd.DataFrame:
         if self.path == None:
@@ -26,11 +28,12 @@ class Plotter:
         loss_test = loss.Test_loss
         plt.plot(loss_train[1:], label="Train")
         plt.plot(loss_test[1:], label="Test")
+        plt.axhline(y=self.goal_line, linestyle="dotted", alpha=0.5, color="grey")
         plt.legend()
         plt.xlabel("Epoch")
         plt.ylabel("Loss (MSE)")
         plt.tight_layout()
-        #plt.yscale("log")
+        # plt.yscale("log")
         if self.save:
             plt.savefig(self.path + "Loss.png")
 
@@ -40,6 +43,10 @@ class Plotter:
         self.path = path
 
         losses = self.load_model_data()
+
+        config = load_config(self.path)
+
+        self.goal_line = config[f"dftb_dft_delta_{config['loss_metric']}"]
 
         self.plot_loss(losses)
 
