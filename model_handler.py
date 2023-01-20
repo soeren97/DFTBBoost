@@ -19,6 +19,8 @@ from torchmetrics import MeanSquaredLogError as MSLE
 from models import GNN, CNN, NN, GNN_plus
 from CostumDataset import CostumDataset
 
+from typing import List
+
 
 class ModelTrainer:
     def __init__(self) -> None:
@@ -40,6 +42,7 @@ class ModelTrainer:
         self.train_loader = None
         self.test_loader = None
         self.data_loader = None
+        self.collate_fn = None
 
         self.optimizer = None
 
@@ -58,8 +61,10 @@ class ModelTrainer:
 
         if model_name in ["GNN", "GNN_plus"]:
             self.loader = GNNDataloader
+            self.collate_fn = utils.costume_collate_GNN
         else:
             self.loader = torch.utils.data.DataLoader
+            self.collate_fn = utils.costume_collate_NN
 
         self.data = CostumDataset(ml_method=model_name)
 
@@ -75,39 +80,62 @@ class ModelTrainer:
         if self.patience == 0:
             self.early_stopping = True
 
-    def train(self) -> torch.Tensor:
+    def evaluate_loss(
+        self,
+        preds: torch.Tensor,
+        n_electrons: torch.Tensor,
+        n_orbitals: torch.Tensor,
+        true: List[torch.Tensor],
+    ) -> torch.Tensor:
+
+        # Calculate eigenvalues
+        eigenvalues, HOMO, LUMO = utils.find_eigenvalues(preds, n_electrons, n_orbitals)
+
+        if self.config["loss_metric"] == "HOMO_LUMO":
+            predicted = torch.stack([HOMO, LUMO])
+            true = torch.stack(true[:2])
+
+        elif self.config["loss_metric"] == "all":
+            predicted = eigenvalues
+            true = true[2]
+
+        else:
+            predicted = preds[:n_orbitals, :n_orbitals]
+            true = true[3]
+
+        loss = self.loss_fn(predicted, true)
+
+        return loss
+
+    def train(self) -> torch.Tensor:  # test new data
         self.model.train()
         for batch in self.train_loader:
+
             self.optimizer.zero_grad()
 
+            (
+                X,
+                Y_HOMO,
+                Y_LUMO,
+                Y_eigenvalues,
+                Y_matrices,
+                n_electrons,
+                n_orbitals,
+            ) = self.collate_fn(batch)
+
+            Y = [Y_HOMO, Y_LUMO, Y_eigenvalues, Y_matrices]
+
+            n_electrons.to(self.device)
+
+            n_orbitals.to(self.device)
+
             if self.model.__class__.__name__ in ["GNN", "GNN_plus"]:
-
-                n_electrons, data = batch[0], Batch.from_data_list(batch[1])
-
-                data.to(self.device)
-
-                preds = self.model(data)
-
-                energies = data.y.reshape(-1, 3)
+                preds = self.model(X)
 
             else:
-                X, Y, n_electrons, energies = batch[0], batch[1], batch[2], batch[3]
-
-                X.to(self.device)
-                Y.to(self.device)
-                n_electrons.to(self.device)
-                energies.to(self.device)
-
                 preds = self.model(X.float())
 
-            if self.model.__class__.__name__ == "CNN":
-                loss = self.loss_fn(preds, Y)
-
-            else:
-                # Calculate HOMO, LUMO and gap
-                preds = utils.find_homo_lumo_pred(preds, n_electrons)
-
-                loss = self.loss_fn(preds, energies)
+            loss = self.evaluate_loss(preds, n_electrons, n_orbitals, Y)
 
             loss.backward()
 
@@ -119,35 +147,28 @@ class ModelTrainer:
     def test(self) -> torch.Tensor:
         self.model.eval()
         for batch in self.test_loader:
-            # Use GPU if available
+            (
+                X,
+                Y_HOMO,
+                Y_LUMO,
+                Y_eigenvalues,
+                Y_matrices,
+                n_electrons,
+                n_orbitals,
+            ) = self.collate_fn(batch)
+
+            Y = [Y_HOMO, Y_LUMO, Y_eigenvalues, Y_matrices]
+
+            n_electrons.to(self.device)
+
+            n_orbitals.to(self.device)
             if self.model.__class__.__name__ in ["GNN", "GNN_plus"]:
-
-                n_electrons, data = batch[0], Batch.from_data_list(batch[1])
-
-                data.to(self.device)
-
-                preds = self.model(data)
-
-                energies = data.y.reshape(-1, 3)
+                preds = self.model(X)
 
             else:
-                X, Y, n_electrons, energies = batch[0], batch[1], batch[2], batch[3]
-
-                X.to(self.device)
-                Y.to(self.device)
-                n_electrons.to(self.device)
-                energies.to(self.device)
-
                 preds = self.model(X.float())
 
-            if self.model.__class__.__name__ == "CNN":
-                loss = self.loss_fn(preds, Y)
-
-            else:
-                # Calculate HOMO, LUMO and gap
-                pred = utils.find_homo_lumo_pred(preds, n_electrons)
-
-                loss = self.loss_fn(pred, energies)
+        loss = self.evaluate_loss(preds, n_electrons, n_orbitals, Y)
 
         return loss
 
@@ -159,14 +180,12 @@ class ModelTrainer:
             self.train_set,
             batch_size=self.batch_size,
             shuffle=True,
-            collate_fn=utils.costume_collate,
         )
 
         self.test_loader = self.loader(
             self.test_set,
             batch_size=self.batch_size,
             shuffle=True,
-            collate_fn=utils.costume_collate,
         )
 
         for epoch in (

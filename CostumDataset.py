@@ -20,16 +20,20 @@ class CostumDataset(Dataset):
     def __getitem__(self, index: int) -> Tuple:
         data = pd.read_pickle(self.file_names[index])
 
-        if self.ml_method in ["GNN", "GNN_plus"]:
-            return data["N_electrons"].tolist(), data[self.ml_method].tolist()
+        X = data["X"].tolist()
 
-        else:
-            X = data[f"{self.ml_method}_X"].tolist()
+        Y = data["Y"]
 
-            Y = data[f"{self.ml_method}_Y"].tolist()
+        HOMO = [row[0] for row in Y]
 
-            N_electrons = data["N_electrons"].tolist()
+        LUMO = [row[1] for row in Y]
 
-            energies = data["Energies"].tolist()
+        eigenvalues = [row[2] for row in Y]
 
-            return X, Y, N_electrons, energies
+        N_orbitals = [row[3] for row in Y]
+
+        ham_over = [row[4] for row in Y]
+
+        N_electrons = data["N_electrons"].tolist()
+
+        return [X, HOMO, LUMO, eigenvalues, ham_over, N_electrons, N_orbitals]

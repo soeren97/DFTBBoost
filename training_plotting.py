@@ -28,7 +28,13 @@ class Plotter:
         loss_test = loss.Test_loss
         plt.plot(loss_train[1:], label="Train")
         plt.plot(loss_test[1:], label="Test")
-        plt.axhline(y=self.goal_line, linestyle="dotted", alpha=0.5, color="grey")
+        plt.axhline(
+            y=self.goal_line,
+            linestyle="dotted",
+            alpha=0.5,
+            color="grey",
+            label="Average dft-dftb error",
+        )
         plt.legend()
         plt.xlabel("Epoch")
         plt.ylabel("Loss (MSE)")

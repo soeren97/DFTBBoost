@@ -360,13 +360,10 @@ class DataTransformer:
 
         GNN_data = []
         GNNplus_data = []
-        CNN_X_list = []
-        CNN_Y_list = []
-        NN_X_list = []
-        NN_Y_list = []
+        X_list = []
+        Y_list = []
         smiles = []
         electron_list = []
-        energies = []
 
         for index, data in tqdm(
             generator, total=end, mininterval=0.2, desc="Saving datasets"
@@ -383,12 +380,6 @@ class DataTransformer:
                 continue
 
             NN_X = torch.concat((hamiltonian_dftb, overlap_dftb))
-
-            Y = torch.concat((hamiltonian_g16, overlap_g16))
-
-            CNN_X = torch.stack((hamdftb_pad, overdftb_pad))
-
-            CNN_Y = torch.stack((hamg16_pad, overg16_pad))
 
             coord = xyz[:, 1:].astype("float64")
 
@@ -433,14 +424,14 @@ class DataTransformer:
             )
 
             try:
-                Y_HOMO_LUMO = utils.find_homo_lumo_true(
+                Y = utils.find_eigenvalues_true(
                     data["Hamiltonian_g16"], data["Overlap_g16"], n_electrons
                 )
             except:
                 print(f"Molecule {smile} failed")
                 continue
 
-            data_graph.y = Y_HOMO_LUMO
+            Y.append(torch.concat((hamiltonian_g16, overlap_g16)))
 
             nx.set_node_attributes(
                 graph_plus,
@@ -471,7 +462,7 @@ class DataTransformer:
                 x=graph_plus.x,
                 edge_index=graph_plus.edge_index,
                 edge_attr=edge_attributes,
-                y=Y_HOMO_LUMO,
+                y=Y,
             )
 
             data_graph_plus.num_nodes = num_nodes
@@ -482,17 +473,11 @@ class DataTransformer:
 
             GNNplus_data.append(data_graph_plus)
 
-            CNN_X_list.append(CNN_X)
+            X_list.append(NN_X)
 
-            CNN_Y_list.append(CNN_Y)
-
-            NN_X_list.append(NN_X)
-
-            NN_Y_list.append(Y)
+            Y_list.append(Y)
 
             electron_list.append(n_electrons)
-
-            energies.append(Y_HOMO_LUMO)
 
             if (index % 32 == 0 and index != 0) or index == end - 1:
                 file_name = (
@@ -506,29 +491,21 @@ class DataTransformer:
 
                 NN = {
                     "SMILES": smiles,
-                    "NN_X": NN_X_list,
-                    "NN_Y": NN_Y_list,
+                    "X": X_list,
+                    "Y": Y_list,
                     "N_electrons": electron_list,
-                    "Energies": energies,
                 }
 
                 NN_data = pd.DataFrame(NN)
 
                 NN_data.to_pickle(save_location + "NN/" + file_name)
 
-                CNN = {
+                GNN = {
                     "SMILES": smiles,
-                    "CNN_X": CNN_X_list,
-                    "CNN_Y": CNN_Y_list,
+                    "X": GNN_data,
+                    "Y": Y_list,
                     "N_electrons": electron_list,
-                    "Energies": energies,
                 }
-
-                CNN_data = pd.DataFrame(CNN)
-
-                CNN_data.to_pickle(save_location + "CNN/" + file_name)
-
-                GNN = {"SMILES": smiles, "GNN": GNN_data, "N_electrons": electron_list}
 
                 GNN_data = pd.DataFrame(GNN)
 
@@ -536,7 +513,8 @@ class DataTransformer:
 
                 GNN_plus = {
                     "SMILES": smiles,
-                    "GNN_plus": GNNplus_data,
+                    "X": GNNplus_data,
+                    "Y": Y_list,
                     "N_electrons": electron_list,
                 }
                 GNNplus_data = pd.DataFrame(GNN_plus)
@@ -544,13 +522,10 @@ class DataTransformer:
 
                 GNN_data = []
                 GNNplus_data = []
-                CNN_X_list = []
-                CNN_Y_list = []
-                NN_X_list = []
-                NN_Y_list = []
+                X_list = []
+                Y_list = []
                 smiles = []
                 electron_list = []
-                energies = []
 
     def load_dftb(self) -> None:
         if os.path.exists("Data/dftb.pkl"):

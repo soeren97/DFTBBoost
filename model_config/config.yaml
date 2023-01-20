@@ -7,4 +7,4 @@ loss_fn: MSE
 lr: 10e-6
 model: GNN
 start_patience: 10
-loss_metric: HOMO_LUMO
+loss_metric: all

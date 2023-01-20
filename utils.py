@@ -9,6 +9,8 @@ from torch._utils import _accumulate
 import yaml
 
 from torch.utils.data.dataset import Subset, Dataset
+from torch_geometric.data import Batch
+
 from typing import Sequence, Union, Generator, List, Dict
 
 
@@ -19,6 +21,8 @@ def load_config(path: str = None) -> Dict:
     """
     if path == None:
         path = "model_config/config.yaml"
+    else:
+        path = path + "config.yaml"
 
     with open(path, "r") as file:
         config = yaml.safe_load(file)
@@ -77,47 +81,22 @@ def convert_tril(tril_tensor: torch.Tensor) -> torch.Tensor:
     return tensor
 
 
-def find_homo_lumo_pred(
-    preds: List[torch.Tensor], n_electrons: List[int]
-) -> torch.Tensor:
-    if type(n_electrons) == torch.Tensor:
-        pass
-    else:
-        n_electrons = torch.cat(n_electrons)
-
-    # Convert tril tensors to full tensors
-    hamiltonians = [convert_tril(pred[:2145]) for pred in preds]
-    overlaps = [convert_tril(pred[2145:]).fill_diagonal_(1) for pred in preds]
-
-    overlaps = torch.stack(overlaps, dim=0)
-    hamiltonians = torch.stack(hamiltonians, dim=0)
-
-    # Compute eigenvalues
-    eigenvalues = eigvalsh(overlaps.inverse() @ hamiltonians)
-
-    # find index of HOMO
-    i = n_electrons // 2  # fix?
-
-    # Select fifth eigenvalue above LUMO
-    LUMO = eigenvalues[range(len(eigenvalues)), i + 6]
-
-    # Select fifth eigenvalue bellow HOMO
-    HOMO = eigenvalues[range(len(eigenvalues)), i - 5]
-
-    # Compute HOMO-LUMO gap
-    gap = LUMO - HOMO
-
-    return torch.stack([HOMO, LUMO, gap], dim=1)
-
-
-def find_homo_lumo_true(
+def find_eigenvalues_true(
     hamiltonian: np.array, overlap: np.array, n_electrons: int
-) -> torch.Tensor:
-    overlap = torch.tensor(overlap)
-    hamiltonian = torch.tensor(hamiltonian)
+) -> List:
+    hamiltonian = torch.Tensor(hamiltonian)
+
+    overlap = torch.Tensor(overlap)
 
     # Compute eigenvalues
     eigenvalues = eigvalsh(overlap.inverse() @ hamiltonian)
+
+    # pad eigenvalues
+    n_orbitals = len(eigenvalues)
+
+    padded_eigenvalues = torch.zeros([65])
+
+    padded_eigenvalues[:n_orbitals] = eigenvalues
 
     # find index of HOMO
     i = n_electrons // 2  # fix?
@@ -128,14 +107,13 @@ def find_homo_lumo_true(
     # Select fifth eigenvalue bellow HOMO
     HOMO = eigenvalues[i - 5]
 
-    # Compute HOMO-LUMO gap
-    gap = LUMO - HOMO
-
-    return torch.stack([HOMO, LUMO, gap])
+    return [HOMO, LUMO, padded_eigenvalues, n_orbitals]
 
 
-def find_eigenvalues(preds: pd.DataFrame, n_electrons: List[int]) -> torch.Tensor:
-    n_electrons = torch.tensor(n_electrons)
+def find_eigenvalues(
+    preds: torch.tensor, n_electrons: torch.Tensor, n_orbitals: torch.Tensor
+) -> torch.Tensor:
+    n_electrons = n_electrons.numpy()
 
     # Convert tril tensors to full tensors
     hamiltonians = [convert_tril(pred[:2145]) for pred in preds]
@@ -159,12 +137,40 @@ def find_eigenvalues(preds: pd.DataFrame, n_electrons: List[int]) -> torch.Tenso
     return eigenvalues, HOMO, LUMO
 
 
-def costume_collate(batch):
+def costume_collate_NN(batch):
     X = torch.stack([tensor for entry in batch for tensor in entry[0]], dim=0)
-    Y = torch.stack([tensor for entry in batch for tensor in entry[1]], dim=0)
-    n_electrons = torch.stack(
-        [torch.tensor(integer) for entry in batch for integer in entry[2]], dim=0
-    )
-    energies = torch.stack([tensor for entry in batch for tensor in entry[3]], dim=0)
 
-    return X, Y, n_electrons, energies
+    HOMO = torch.stack([tensor for entry in batch for tensor in entry[1]], dim=0)
+
+    LUMO = torch.stack([tensor for entry in batch for tensor in entry[2]], dim=0)
+
+    eigenvalues = torch.stack([tensor for entry in batch for tensor in entry[3]], dim=0)
+
+    ham_over = torch.stack([tensor for entry in batch for tensor in entry[4]], dim=0)
+
+    n_electrons = torch.stack(
+        [torch.tensor(integer) for entry in batch for integer in entry[5]], dim=0
+    )
+
+    n_orbitals = torch.stack(
+        [torch.tensor(integer) for entry in batch for integer in entry[6]], dim=0
+    )
+    return X, HOMO, LUMO, eigenvalues, ham_over, n_electrons, n_orbitals
+
+
+def costume_collate_GNN(batch):
+    X = Batch.from_data_list(batch[0])
+
+    HOMO = torch.stack(batch[1], dim=0).reshape(-1)
+
+    LUMO = torch.stack(batch[2], dim=0).reshape(-1)
+
+    eigenvalues = torch.stack(batch[3], dim=0).reshape(-1, 65)
+
+    ham_over = torch.stack(batch[4], dim=0).reshape(-1, 2145)
+
+    n_electrons = torch.stack(batch[5], dim=0).reshape(-1)
+
+    n_orbitals = torch.stack(batch[6], dim=0).reshape(-1)
+
+    return X, HOMO, LUMO, eigenvalues, ham_over, n_electrons, n_orbitals
