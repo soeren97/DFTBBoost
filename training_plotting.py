@@ -24,17 +24,27 @@ class Plotter:
         return pd.read_pickle(self.path + "losses.pkl")
 
     def plot_loss(self, loss: pd.DataFrame) -> None:
+        fig, ax = plt.subplots()
         loss_train = loss.Train_loss
         loss_test = loss.Test_loss
-        plt.plot(loss_train[1:], label="Train")
-        plt.plot(loss_test[1:], label="Test")
-        plt.axhline(
+        ax.plot(loss_train, label="Train", color="blue")
+        ax.plot(loss_test, label="Test", color="orange")
+        ax.axhline(
             y=self.goal_line,
             linestyle="dotted",
             alpha=0.5,
             color="grey",
             label="Average dft-dftb error",
         )
+
+        zoomed_ax = ax.inset_axes([0.5, 0.3, 0.4, 0.45])
+        zoomed_ax.plot(loss_train[-15:], color="dodgerblue")
+        zoomed_ax.plot(loss_test[-15:], color="darkorange")
+        zoomed_ax.axhline(y=self.goal_line, linestyle="dotted", alpha=0.5, color="grey")
+        zoomed_ax.set_ylim(bottom=0)
+
+        ax.indicate_inset_zoom(zoomed_ax, edgecolor="grey")
+
         plt.legend()
         plt.xlabel("Epoch")
         plt.ylabel("Loss [Ha] (MSE)")
