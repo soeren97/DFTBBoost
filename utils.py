@@ -116,7 +116,6 @@ def find_eigenvalues(
     n_electrons = n_electrons.numpy()
 
     # Convert tril tensors to full tensors
-    # TODO: Fix "ALL" metric in convert_tril
     hamiltonians = [
         convert_tril(pred[:2145], n_orbital)
         for pred, n_orbital in zip(preds, n_orbitals)
