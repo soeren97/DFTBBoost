@@ -10,3 +10,4 @@ g16_reformating.py
 compare_dftb_g16.py
 Optuna/
 Figures/
+model_config/
