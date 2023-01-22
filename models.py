@@ -43,7 +43,7 @@ class GNN(Module):
 class GNN_plus(Module):
     def __init__(self):
         super(GNN_plus, self).__init__()
-        self.embedding_size = 8
+        self.embedding_size = 64
 
         self.initial_conv = GATConv(8, self.embedding_size)
         self.conv1 = GATConv(self.embedding_size, self.embedding_size)
@@ -129,5 +129,9 @@ class NN(Module):
 
 models = [NN(), GNN(), GNN_plus()]
 
-for model in models:
-    print(sum(p.numel() for p in model.parameters()))
+if __name__ == "__main__":
+    for model in models:
+        model_name = model.__class__.__name__
+        print(
+            f"{model_name} has {sum(p.numel() for p in model.parameters())} parameters"
+        )

@@ -33,8 +33,9 @@ class ModelTrainer:
         self.patience = 50
         self.reset_patience = None
         self.early_stopping = False
-        self.lr = 0
-        self.decay_rate = 0
+        self.lr = None
+        self.decay_rate = None
+        self.loss_metric = None
 
         self.epochs = None
         self.batch_size = None
@@ -45,8 +46,6 @@ class ModelTrainer:
         self.collate_fn = None
 
         self.optimizer = None
-
-        self.config = None
 
         self.data = None
         self.train_set = None
@@ -91,16 +90,17 @@ class ModelTrainer:
         # Calculate eigenvalues
         eigenvalues, HOMO, LUMO = utils.find_eigenvalues(preds, n_electrons, n_orbitals)
 
-        if self.config["loss_metric"] == "HOMO_LUMO":
+        if self.loss_metric == "HOMO_LUMO":
             predicted = torch.stack([HOMO, LUMO])
             true = torch.stack(true[:2])
 
-        elif self.config["loss_metric"] == "all":
+        elif self.loss_metric == "All":
             predicted = eigenvalues
             true = true[2]
 
         else:
-            predicted = preds[:n_orbitals, :n_orbitals]
+            # TODO: Does not work, take from find_eigenvalues as it already zero out unwanted orbitals
+            predicted = utils.zero_prediction_padding(preds, n_orbitals)
             true = true[3]
 
         loss = self.loss_fn(predicted, true)
@@ -221,13 +221,14 @@ class ModelTrainer:
         return pd.DataFrame(losses, columns=["Train_loss", "Test_loss"])
 
     def main(self) -> None:
-        self.config = utils.load_config()
-        self.epochs = self.config["epochs"]
-        self.batch_size = int(self.config["batch_size"] / 32)
-        self.decay_rate = float(self.config["decay_rate"])
-        self.lr = float(self.config["lr"])
-        self.reset_patience = self.config["start_patience"]
-        self.model = eval(self.config["model"])().to(self.device)
+        config = utils.load_config()
+        self.epochs = config["epochs"]
+        self.batch_size = int(config["batch_size"] / 32)
+        self.decay_rate = float(config["decay_rate"])
+        self.lr = float(config["lr"])
+        self.reset_patience = config["start_patience"]
+        self.model = eval(config["model"])().to(self.device)
+        self.loss_metric = config["loss_metric"]
 
         self.save_model = True
         self.model_folder = "Models/m" + str(time.time())[:-8] + "/"
@@ -236,7 +237,7 @@ class ModelTrainer:
             self.model.parameters(), lr=self.lr, weight_decay=self.decay_rate
         )
 
-        self.loss_fn = eval(self.config["loss_fn"])().to(self.device)
+        self.loss_fn = eval(config["loss_fn"])().to(self.device)
 
         self.data_intervals = os.listdir("Data/datasets")
 

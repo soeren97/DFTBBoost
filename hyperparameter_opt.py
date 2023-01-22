@@ -17,6 +17,7 @@ from torchmetrics import MeanSquaredLogError as MSLE
 
 def hyperparameter_objective(trail: optuna.Trial, trainer: ModelTrainer) -> float:
     trainer.model = GNN_plus().to(trainer.device)
+    trainer.loss_metric = "All"
 
     trainer.lr = trail.suggest_float("Learning_rate", 1e-9, 1e-5, log=True)
     trainer.decay_rate = trail.suggest_float("Decay_rate", 1e-4, 0.1, step=1e-4)
@@ -56,10 +57,10 @@ def optimize_model():
     pruner = optuna.pruners.SuccessiveHalvingPruner()
 
     # storage = optuna.storages.RDBStorage(f'/Optuna/studies/{now}.db')
-    storage = f"sqlite:///Optuna/studies/{now}.db"
+    # storage = f"sqlite:///Optuna/studies/{now}.db"
 
     study = optuna.create_study(
-        direction="minimize", pruner=pruner, storage=storage, study_name=model_name
+        direction="minimize", pruner=pruner, study_name=model_name
     )
 
     study.optimize(
