@@ -125,3 +125,9 @@ class NN(Module):
         out = self.out(hidden)
 
         return out
+
+
+models = [NN(), GNN(), GNN_plus()]
+
+for model in models:
+    print(sum(p.numel() for p in model.parameters()))

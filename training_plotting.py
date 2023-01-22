@@ -37,7 +37,7 @@ class Plotter:
         )
         plt.legend()
         plt.xlabel("Epoch")
-        plt.ylabel("Loss (MSE)")
+        plt.ylabel("Loss [Ha] (MSE)")
         plt.tight_layout()
         # plt.yscale("log")
         if self.save:
