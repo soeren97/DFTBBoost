@@ -72,12 +72,12 @@ def random_split(
     ]
 
 
-def convert_tril(tril_tensor: torch.Tensor) -> torch.Tensor:
+def convert_tril(tril_tensor: torch.Tensor, n_orbitals: torch.Tensor) -> torch.Tensor:
     tensor = torch.zeros(65, 65, dtype=torch.float32)
     indices = torch.tril_indices(65, 65)
     tensor[indices[0], indices[1]] = tril_tensor.to(torch.float)
-    idx = np.arange(tensor.shape[0])
-    tensor[idx, idx] = tensor[idx, idx]
+    tensor[n_orbitals:] *= 0
+    tensor[:, n_orbitals:] *= 0
     return tensor
 
 
@@ -116,8 +116,16 @@ def find_eigenvalues(
     n_electrons = n_electrons.numpy()
 
     # Convert tril tensors to full tensors
-    hamiltonians = [convert_tril(pred[:2145]) for pred in preds]
-    overlaps = [convert_tril(pred[2145:]).fill_diagonal_(1) for pred in preds]
+    # TODO: Fix "ALL" metric in convert_tril
+    hamiltonians = [
+        convert_tril(pred[:2145], n_orbital)
+        for pred, n_orbital in zip(preds, n_orbitals)
+    ]
+
+    overlaps = [
+        convert_tril(pred[2145:], n_orbital).fill_diagonal_(1)
+        for pred, n_orbital in zip(preds, n_orbitals)
+    ]
 
     overlaps = torch.stack(overlaps, dim=0)
     hamiltonians = torch.stack(hamiltonians, dim=0)
