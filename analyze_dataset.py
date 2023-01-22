@@ -20,12 +20,12 @@ def compare_datasets(CONFIG):
     for i in tqdm(files, desc="Calc dft, dftb diff", leave=False):
         data = pd.read_pickle(path + i)
 
-        dftb = data["X"]
+        dftb = torch.stack(data["X"].tolist())
         Y = data["Y"]
-        n_electrons = data["N_electrons"].to_list()
+        n_electrons = torch.tensor(data["N_electrons"])
 
         n_orbitals = [row[3] for row in Y]
-        dft = [row[4] for row in Y]
+        dft = torch.stack([row[4] for row in Y])
 
         dftb_eigenvalues, dftb_HOMO, dftb_LUMO = find_eigenvalues(
             dftb, n_electrons, n_orbitals
