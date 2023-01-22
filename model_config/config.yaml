@@ -2,7 +2,8 @@ batch_size: 2048
 decay_rate: 0.005
 dftb_dft_delta_HOMO_LUMO: 0.1707029938697815
 dftb_dft_delta_all: 1.6397079229354858
-epochs: 100
+dftb_dft_delta_Matrix:
+epochs: 300
 loss_fn: MSE
 lr: 10e-6
 model: GNN
