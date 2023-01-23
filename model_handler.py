@@ -221,6 +221,10 @@ class ModelTrainer:
         return pd.DataFrame(losses, columns=["Train_loss", "Test_loss"])
 
     def main(self) -> None:
+        self.model_folder = "Models/m" + str(time.time())[:-8] + "/"
+        os.mkdir(self.model_folder)
+        shutil.copy("model_config/config.yaml", self.model_folder + "config.yaml")
+
         config = utils.load_config()
         self.epochs = config["epochs"]
         self.batch_size = int(config["batch_size"] / 32)
@@ -229,9 +233,6 @@ class ModelTrainer:
         self.reset_patience = config["start_patience"]
         self.model = eval(config["model"])().to(self.device)
         self.loss_metric = config["loss_metric"]
-
-        self.save_model = True
-        self.model_folder = "Models/m" + str(time.time())[:-8] + "/"
 
         self.optimizer = torch.optim.Adam(
             self.model.parameters(), lr=self.lr, weight_decay=self.decay_rate
@@ -245,11 +246,8 @@ class ModelTrainer:
 
         loss_df = self.train_model()
 
-        if self.save_model:
-            os.mkdir(self.model_folder)
-            torch.save(self.model, self.model_folder + "model.pkl")
-            loss_df.to_pickle(self.model_folder + "losses.pkl")
-            shutil.copy("model_config/config.yaml", self.model_folder + "config.yaml")
+        torch.save(self.model, self.model_folder + "model.pkl")
+        loss_df.to_pickle(self.model_folder + "losses.pkl")
 
 
 if __name__ == "__main__":
