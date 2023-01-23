@@ -24,7 +24,7 @@ def hyperparameter_objective(trail: optuna.Trial, trainer: ModelTrainer) -> floa
     trainer.batch_size = 2 ** trail.suggest_int("Batch_size", 9, 12)
     epsilon = trail.suggest_float("Epsilon", 1e-7, 1e-4)
     trainer.loss_fn = MSE()
-    trainer.reset_patience = 10
+    trainer.reset_patience = 20
     trainer.patience = 50
     trainer.early_stopping = False
 
@@ -46,7 +46,7 @@ def optimize_model():
     now = datetime.now().strftime("%y_%m_%d_%H%M%S")
 
     model_trainer = ModelTrainer()
-    model_trainer.epochs = 100
+    model_trainer.epochs = 1000
     model_trainer.data_intervals = os.listdir("Data/datasets")
     model_trainer.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model_trainer.model = GNN().to(model_trainer.device)
