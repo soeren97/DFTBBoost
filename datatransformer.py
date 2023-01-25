@@ -358,6 +358,7 @@ class DataTransformer:
 
         save_location = "Data/datasets/"
 
+        GNNminus_data = []
         GNN_data = []
         GNNplus_data = []
         X_list = []
@@ -387,6 +388,8 @@ class DataTransformer:
 
             graph_plus = graph.copy()
 
+            graph_minus = graph.copy()
+
             feature = self.element_to_onehot(
                 np.asarray(graph.nodes(data="element"))[:, 1]
             )
@@ -394,6 +397,33 @@ class DataTransformer:
             # This function includes what type of bond connects two nodes and is used as edge_attr
             bond_attributes = from_smiles(smile, with_hydrogen=True).edge_attr
 
+            # GNN_minus
+            nx.set_node_attributes(
+                graph_minus,
+                {
+                    k: {"x": [feature[k]]}
+                    for k, d in dict(graph_minus.nodes(data=True)).items()
+                },
+            )
+
+            graph_minus = from_networkx(graph_minus)
+
+            del graph_minus["element"], graph_minus["aromatic"], graph_minus["charge"]
+
+            # [:,0] describes what type of bond the edge is, ie a single, double or triple bond
+            edge_attributes = bond_attributes[:, 0].clone()
+
+            data_graph_minus = GraphData(
+                x=graph_minus.x,
+                edge_index=graph.edge_index,
+                edge_attr=edge_attributes,
+            )
+
+            num_nodes = graph_minus.num_nodes
+
+            data_graph_minus.num_nodes = num_nodes
+
+            # GNN
             nx.set_node_attributes(
                 graph,
                 {
@@ -419,6 +449,7 @@ class DataTransformer:
 
             data_graph.num_nodes = num_nodes
 
+            # GNN_plus
             nodes_ham, edge_attributes, n_electrons = self.extract_data_from_matrices(
                 graph, hamdftb_pad, overdftb_pad, edge_attributes
             )
@@ -469,6 +500,8 @@ class DataTransformer:
 
             smiles.append(smile)
 
+            GNNminus_data.append(data_graph_minus)
+
             GNN_data.append(data_graph)
 
             GNNplus_data.append(data_graph_plus)
@@ -500,6 +533,15 @@ class DataTransformer:
 
                 NN_data.to_pickle(save_location + "NN/" + file_name)
 
+                GNN_minus = {
+                    "SMILES": smiles,
+                    "X": GNNminus_data,
+                    "Y": Y_list,
+                    "N_electrons": electron_list,
+                }
+                GNNminus_data = pd.DataFrame(GNN_minus)
+                GNNminus_data.to_pickle(save_location + "GNN_minus/" + file_name)
+
                 GNN = {
                     "SMILES": smiles,
                     "X": GNN_data,
@@ -520,6 +562,7 @@ class DataTransformer:
                 GNNplus_data = pd.DataFrame(GNN_plus)
                 GNNplus_data.to_pickle(save_location + "GNN_plus/" + file_name)
 
+                GNNminus_data = []
                 GNN_data = []
                 GNNplus_data = []
                 X_list = []
