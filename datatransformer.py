@@ -397,32 +397,6 @@ class DataTransformer:
             # This function includes what type of bond connects two nodes and is used as edge_attr
             bond_attributes = from_smiles(smile, with_hydrogen=True).edge_attr
 
-            # GNN_minus
-            nx.set_node_attributes(
-                graph_minus,
-                {
-                    k: {"x": [feature[k]]}
-                    for k, d in dict(graph_minus.nodes(data=True)).items()
-                },
-            )
-
-            graph_minus = from_networkx(graph_minus)
-
-            del graph_minus["element"], graph_minus["aromatic"], graph_minus["charge"]
-
-            # [:,0] describes what type of bond the edge is, ie a single, double or triple bond
-            edge_attributes = bond_attributes[:, 0].clone()
-
-            data_graph_minus = GraphData(
-                x=graph_minus.x,
-                edge_index=graph.edge_index,
-                edge_attr=edge_attributes,
-            )
-
-            num_nodes = graph_minus.num_nodes
-
-            data_graph_minus.num_nodes = num_nodes
-
             # GNN
             nx.set_node_attributes(
                 graph,
@@ -448,6 +422,32 @@ class DataTransformer:
             num_nodes = graph.num_nodes
 
             data_graph.num_nodes = num_nodes
+
+            # GNN_minus
+            nx.set_node_attributes(
+                graph_minus,
+                {
+                    k: {"x": [feature[k]]}
+                    for k, d in dict(graph_minus.nodes(data=True)).items()
+                },
+            )
+
+            graph_minus = from_networkx(graph_minus)
+
+            del graph_minus["element"], graph_minus["aromatic"], graph_minus["charge"]
+
+            # [:,0] describes what type of bond the edge is, ie a single, double or triple bond
+            edge_attributes = bond_attributes[:, 0].clone()
+
+            data_graph_minus = GraphData(
+                x=graph_minus.x,
+                edge_index=graph_minus.edge_index,
+                edge_attr=edge_attributes,
+            )
+
+            num_nodes = graph_minus.num_nodes
+
+            data_graph_minus.num_nodes = num_nodes
 
             # GNN_plus
             nodes_ham, edge_attributes, n_electrons = self.extract_data_from_matrices(
