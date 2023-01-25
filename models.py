@@ -6,6 +6,47 @@ from torch_geometric.nn import global_mean_pool as gap, global_max_pool as gmp
 from torch_geometric.nn import GATConv, BatchNorm
 
 
+class GNN_minus(Module):
+    def __init__(self):
+        super(GNN_minus, self).__init__()
+        self.embedding_size = 16
+
+        self.initial_conv = GATConv(4, self.embedding_size)
+        self.conv1 = GATConv(self.embedding_size, self.embedding_size)
+        self.conv2 = GATConv(self.embedding_size, self.embedding_size)
+        self.batchnorm = BatchNorm(self.embedding_size)
+        self.out = Linear(self.embedding_size * 2, 2145 * 2)
+
+    def forward(self, data):
+        x = data.x.float()
+        edge_index = data.edge_index
+        batch_index = data.batch
+        edge_attr = data.edge_attr
+
+        hidden = self.initial_conv(x, edge_index, edge_attr)
+        hidden = torch.tanh(hidden)
+        hidden = F.dropout(hidden, p=0.2)
+
+        hidden = self.batchnorm(hidden)
+
+        hidden = self.conv1(hidden, edge_index, edge_attr)
+        hidden = torch.tanh(hidden)
+        hidden = F.dropout(hidden, p=0.2)
+
+        hidden = self.batchnorm(hidden)
+
+        hidden = self.conv1(hidden, edge_index, edge_attr)
+        hidden = torch.tanh(hidden)
+        hidden = F.dropout(hidden, p=0.2)
+
+        # Global Pooling (stack different aggregations)
+        hidden = torch.cat([gmp(hidden, batch_index), gap(hidden, batch_index)], dim=1)
+
+        out = self.out(hidden)
+
+        return out
+
+
 class GNN(Module):
     def __init__(self):
         super(GNN, self).__init__()

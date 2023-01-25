@@ -16,7 +16,7 @@ from torchmetrics import MeanSquaredError as MSE
 from torchmetrics import MeanAbsoluteError as MAE
 from torchmetrics import MeanSquaredLogError as MSLE
 
-from models import GNN, CNN, NN, GNN_plus
+from models import GNN, CNN, NN, GNN_plus, GNN_minus
 from CostumDataset import CostumDataset
 
 from typing import List
