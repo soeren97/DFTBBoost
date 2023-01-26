@@ -11,7 +11,7 @@ class GNN_minus(Module):
         super(GNN_minus, self).__init__()
         self.embedding_size = 16
 
-        self.initial_conv = GATConv(4, self.embedding_size)
+        self.initial_conv = GATConv(1, self.embedding_size)
         self.conv1 = GATConv(self.embedding_size, self.embedding_size)
         self.conv2 = GATConv(self.embedding_size, self.embedding_size)
         self.batchnorm = BatchNorm(self.embedding_size)

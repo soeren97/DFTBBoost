@@ -436,9 +436,6 @@ class DataTransformer:
 
             del graph_minus["element"], graph_minus["aromatic"], graph_minus["charge"]
 
-            # [:,0] describes what type of bond the edge is, ie a single, double or triple bond
-            edge_attributes = bond_attributes[:, 0].clone()
-
             data_graph_minus = GraphData(
                 x=graph_minus.x,
                 edge_index=graph_minus.edge_index,

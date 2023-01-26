@@ -58,7 +58,7 @@ class ModelTrainer:
     def setup_data(self) -> None:
         model_name = self.model.__class__.__name__
 
-        if model_name in ["GNN", "GNN_plus"]:
+        if model_name in ["GNN", "GNN_plus", "GNN_minus"]:
             self.loader = GNNDataloader
             self.collate_fn = utils.costume_collate_GNN
         else:
@@ -129,7 +129,7 @@ class ModelTrainer:
 
             n_orbitals.to(self.device)
 
-            if self.model.__class__.__name__ in ["GNN", "GNN_plus"]:
+            if self.model.__class__.__name__ in ["GNN", "GNN_plus", "GNN_minus"]:
                 preds = self.model(X)
 
             else:
@@ -162,7 +162,7 @@ class ModelTrainer:
             n_electrons.to(self.device)
 
             n_orbitals.to(self.device)
-            if self.model.__class__.__name__ in ["GNN", "GNN_plus"]:
+            if self.model.__class__.__name__ in ["GNN", "GNN_plus", "GNN_minus"]:
                 preds = self.model(X)
 
             else:
@@ -222,8 +222,9 @@ class ModelTrainer:
 
     def main(self) -> None:
         self.model_folder = "Models/m" + str(time.time())[:-8] + "/"
-        os.mkdir(self.model_folder)
-        shutil.copy("model_config/config.yaml", self.model_folder + "config.yaml")
+        if self.save_model:
+            os.mkdir(self.model_folder)
+            shutil.copy("model_config/config.yaml", self.model_folder + "config.yaml")
 
         config = utils.load_config()
         self.epochs = config["epochs"]
@@ -246,8 +247,9 @@ class ModelTrainer:
 
         loss_df = self.train_model()
 
-        torch.save(self.model, self.model_folder + "model.pkl")
-        loss_df.to_pickle(self.model_folder + "losses.pkl")
+        if self.save_model:
+            torch.save(self.model, self.model_folder + "model.pkl")
+            loss_df.to_pickle(self.model_folder + "losses.pkl")
 
 
 if __name__ == "__main__":
