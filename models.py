@@ -9,7 +9,7 @@ from torch_geometric.nn import GATConv, BatchNorm
 class GNN_minus(Module):
     def __init__(self):
         super(GNN_minus, self).__init__()
-        self.embedding_size = 16
+        self.embedding_size = 64
 
         self.initial_conv = GATConv(1, self.embedding_size)
         self.conv1 = GATConv(self.embedding_size, self.embedding_size)

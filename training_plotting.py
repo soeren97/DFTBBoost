@@ -5,7 +5,8 @@ import pandas as pd
 
 from utils import load_config
 
-sns.set_theme()
+sns.set_style("white")
+sns.set_style("ticks")
 
 
 class Plotter:
@@ -33,14 +34,16 @@ class Plotter:
             y=self.goal_line,
             linestyle="dotted",
             alpha=0.5,
-            color="grey",
+            color="black",
             label="Average dft-dftb error",
         )
 
         zoomed_ax = ax.inset_axes([0.5, 0.3, 0.4, 0.45])
         zoomed_ax.plot(loss_train[-15:], color="dodgerblue")
         zoomed_ax.plot(loss_test[-15:], color="darkorange")
-        zoomed_ax.axhline(y=self.goal_line, linestyle="dotted", alpha=0.5, color="grey")
+        zoomed_ax.axhline(
+            y=self.goal_line, linestyle="dotted", alpha=0.5, color="black"
+        )
         zoomed_ax.set_ylim(bottom=0)
 
         ax.indicate_inset_zoom(zoomed_ax, edgecolor="grey")
@@ -49,7 +52,10 @@ class Plotter:
         plt.xlabel("Epoch")
         plt.ylabel("Loss [Ha] (MSE)")
         plt.tight_layout()
-        # plt.yscale("log")
+
+        plt.xlim(left=0)
+        plt.ylim(bottom=0)
+
         if self.save:
             plt.savefig(self.path + "Loss.png")
 
