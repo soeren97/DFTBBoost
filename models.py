@@ -5,6 +5,8 @@ import torch.nn.functional as F
 from torch_geometric.nn import global_mean_pool as gap, global_max_pool as gmp
 from torch_geometric.nn import GATConv, BatchNorm
 
+from torch import optim
+from torch.optim.lr_scheduler import StepLR
 
 class GNN_minus(Module):
     def __init__(self):
@@ -56,6 +58,12 @@ class GNN(Module):
         self.conv1 = GATConv(self.embedding_size, self.embedding_size)
         self.batchnorm = BatchNorm(self.embedding_size)
         self.out = Linear(self.embedding_size * 2, 2145 * 2)
+        
+        self.optimizer = optim.LBFGS(
+            self.parameters(), lr=1.0, max_iter=20, history_size=100, 
+            tolerance_grad=1e-7, tolerance_change=1e-9
+        )
+        self.scheduler = StepLR(self.optimizer, step_size=100, gamma=0.1)
 
     def forward(self, data):
         x = data.x.float()
