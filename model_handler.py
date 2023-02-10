@@ -187,12 +187,18 @@ class ModelTrainer:
             batch_size=self.batch_size,
             shuffle=True,
         )
+        
+        # Define optimizer and learning rate scheduler
+        self.optimizer = optim.LBFGS(self.model.parameters(), lr=self.lr)
+        self.scheduler = optim.lr_scheduler.StepLR(self.optimizer, step_size=100, gamma=0.1)
 
         for epoch in (
             pbar := tqdm(
                 range(self.epochs), total=self.epochs, desc="Training", leave=False
             )
         ):
+            self.scheduler.step()
+            
             loss_train = self.train()
             losses_train.append(loss_train.cpu().detach())
 
