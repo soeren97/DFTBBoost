@@ -3,7 +3,7 @@ from torch.nn import Linear, Dropout2d, Conv2d, Module
 import torch.nn.functional as F
 
 from torch_geometric.nn import global_mean_pool as gap, global_max_pool as gmp
-from torch_geometric.nn import GATConv, BatchNorm
+from torch_geometric.nn import GATConv, BatchNorm, GraphNorm
 
 
 class GNN_minus(Module):
@@ -15,6 +15,7 @@ class GNN_minus(Module):
         self.conv1 = GATConv(self.embedding_size, self.embedding_size)
         self.conv2 = GATConv(self.embedding_size, self.embedding_size)
         self.batchnorm = BatchNorm(self.embedding_size)
+        self.graphnorm = GraphNorm(self.embedding_size, eps=1e-5)
         self.out = Linear(self.embedding_size * 2, 2145 * 2)
 
     def forward(self, data):
@@ -28,12 +29,14 @@ class GNN_minus(Module):
         hidden = F.dropout(hidden, p=0.2)
 
         hidden = self.batchnorm(hidden)
+        hidden = self.graphnorm(hidden)
 
         hidden = self.conv1(hidden, edge_index, edge_attr)
         hidden = torch.tanh(hidden)
         hidden = F.dropout(hidden, p=0.2)
 
         hidden = self.batchnorm(hidden)
+        hidden = self.graphnorm(hidden)
 
         hidden = self.conv1(hidden, edge_index, edge_attr)
         hidden = torch.tanh(hidden)
@@ -55,6 +58,7 @@ class GNN(Module):
         self.initial_conv = GATConv(4, self.embedding_size)
         self.conv1 = GATConv(self.embedding_size, self.embedding_size)
         self.batchnorm = BatchNorm(self.embedding_size)
+        self.graphnorm = GraphNorm(self.embedding_size, eps=1e-5)
         self.out = Linear(self.embedding_size * 2, 2145 * 2)
 
     def forward(self, data):
@@ -68,6 +72,7 @@ class GNN(Module):
         hidden = F.dropout(hidden, p=0.2)
 
         hidden = self.batchnorm(hidden)
+        hidden = self.graphnorm(hidden)
 
         hidden = self.conv1(hidden, edge_index, edge_attr)
         hidden = torch.tanh(hidden)
@@ -90,6 +95,7 @@ class GNN_plus(Module):
         self.conv1 = GATConv(self.embedding_size, self.embedding_size)
 
         self.batchnorm = BatchNorm(self.embedding_size)
+        self.graphnorm = GraphNorm(self.embedding_size, eps=1e-5)
 
         self.out = Linear(self.embedding_size * 2, 2145 * 2)
 
@@ -104,6 +110,7 @@ class GNN_plus(Module):
         hidden = F.dropout(hidden, p=0.2)
 
         hidden = self.batchnorm(hidden)
+        hidden = self.graphnorm(hidden)
 
         hidden = self.conv1(hidden, edge_index, edge_attr)
         hidden = torch.tanh(hidden)
