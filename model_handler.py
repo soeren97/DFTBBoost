@@ -46,6 +46,7 @@ class ModelTrainer:
         self.collate_fn = None
 
         self.optimizer = None
+        self.scheduler = None
 
         self.data = None
         self.train_set = None
@@ -196,6 +197,8 @@ class ModelTrainer:
             loss_train = self.train()
             losses_train.append(loss_train.cpu().detach())
 
+            self.scheduler.step()
+
             loss_test = self.test()
             losses_test.append(loss_test.cpu().detach())
 
@@ -237,6 +240,11 @@ class ModelTrainer:
 
         self.optimizer = torch.optim.Adam(
             self.model.parameters(), lr=self.lr, weight_decay=self.decay_rate
+        )
+
+        # self.optimizer = torch.optim.LBFGS(self.model.parameters(), lr=self.lr)
+        self.scheduler = torch.optim.lr_scheduler.StepLR(
+            self.optimizer, step_size=100, gamma=0.1
         )
 
         self.loss_fn = eval(config["loss_fn"])().to(self.device)
