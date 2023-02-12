@@ -222,9 +222,9 @@ class ModelTrainer:
 
     def main(self) -> None:
         self.model_folder = "Models/m" + str(time.time())[:-8] + "/"
-        if self.save_model:
-            os.mkdir(self.model_folder)
-            shutil.copy("model_config/config.yaml", self.model_folder + "config.yaml")
+
+        os.mkdir(self.model_folder)
+        shutil.copy("model_config/config.yaml", self.model_folder + "config.yaml")
 
         config = utils.load_config()
         self.epochs = config["epochs"]
@@ -247,9 +247,8 @@ class ModelTrainer:
 
         loss_df = self.train_model()
 
-        if self.save_model:
-            torch.save(self.model, self.model_folder + "model.pkl")
-            loss_df.to_pickle(self.model_folder + "losses.pkl")
+        torch.save(self.model, self.model_folder + "model.pkl")
+        loss_df.to_pickle(self.model_folder + "losses.pkl")
 
 
 if __name__ == "__main__":
