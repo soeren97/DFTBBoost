@@ -108,40 +108,42 @@ class ModelTrainer:
 
         return loss
 
+    def closure(self, batch):
+        self.optimizer.zero_grad()
+        (
+            X,
+            Y_HOMO,
+            Y_LUMO,
+            Y_eigenvalues,
+            Y_matrices,
+            n_electrons,
+            n_orbitals,
+        ) = self.collate_fn(batch)
+
+        Y = [Y_HOMO, Y_LUMO, Y_eigenvalues, Y_matrices]
+
+        n_electrons.to(self.device)
+
+        n_orbitals.to(self.device)
+
+        if self.model.__class__.__name__ in ["GNN", "GNN_plus", "GNN_minus"]:
+            preds = self.model(X)
+
+        else:
+            preds = self.model(X.float())
+
+        loss = self.evaluate_loss(preds, n_electrons, n_orbitals, Y)
+
+        loss.backward()
+
+        # Update using the gradients
+        self.optimizer.step()
+
     def train(self) -> torch.Tensor:  # test new data
         self.model.train()
         for batch in self.train_loader:
 
-            self.optimizer.zero_grad()
-
-            (
-                X,
-                Y_HOMO,
-                Y_LUMO,
-                Y_eigenvalues,
-                Y_matrices,
-                n_electrons,
-                n_orbitals,
-            ) = self.collate_fn(batch)
-
-            Y = [Y_HOMO, Y_LUMO, Y_eigenvalues, Y_matrices]
-
-            n_electrons.to(self.device)
-
-            n_orbitals.to(self.device)
-
-            if self.model.__class__.__name__ in ["GNN", "GNN_plus", "GNN_minus"]:
-                preds = self.model(X)
-
-            else:
-                preds = self.model(X.float())
-
-            loss = self.evaluate_loss(preds, n_electrons, n_orbitals, Y)
-
-            loss.backward()
-
-            # Update using the gradients
-            self.optimizer.step()
+            loss = self.optimizer.step(self.closure(batch))
 
         return loss
 
