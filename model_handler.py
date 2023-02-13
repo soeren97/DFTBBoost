@@ -139,11 +139,13 @@ class ModelTrainer:
         # Update using the gradients
         self.optimizer.step()
 
+        return loss
+
     def train(self) -> torch.Tensor:  # test new data
         self.model.train()
         for batch in self.train_loader:
 
-            loss = self.optimizer.step(self.closure(batch))
+            loss = self.optimizer.step(lambda: self.closure(batch))
 
         return loss
 
