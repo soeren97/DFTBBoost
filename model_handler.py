@@ -34,7 +34,6 @@ class ModelTrainer:
         self.reset_patience = None
         self.early_stopping = False
         self.lr = None
-        self.decay_rate = None
         self.loss_metric = None
 
         self.epochs = None
@@ -136,9 +135,6 @@ class ModelTrainer:
 
         loss.backward()
 
-        # Update using the gradients
-        self.optimizer.step()
-
         return loss
 
     def train(self) -> torch.Tensor:  # test new data
@@ -236,17 +232,12 @@ class ModelTrainer:
         config = utils.load_config()
         self.epochs = config["epochs"]
         self.batch_size = int(config["batch_size"] / 32)
-        self.decay_rate = float(config["decay_rate"])
         self.lr = float(config["lr"])
         self.reset_patience = config["start_patience"]
         self.model = eval(config["model"])().to(self.device)
         self.loss_metric = config["loss_metric"]
 
-        self.optimizer = torch.optim.Adam(
-            self.model.parameters(), lr=self.lr, weight_decay=self.decay_rate
-        )
-
-        # self.optimizer = torch.optim.LBFGS(self.model.parameters(), lr=self.lr)
+        self.optimizer = torch.optim.LBFGS(self.model.parameters(), lr=self.lr)
         self.scheduler = torch.optim.lr_scheduler.StepLR(
             self.optimizer, step_size=100, gamma=0.1
         )

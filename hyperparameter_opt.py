@@ -5,7 +5,7 @@ import yaml
 from datetime import datetime
 
 from model_handler import ModelTrainer
-from models import GNN, NN, GNN_plus
+from models import GNN, NN, GNN_plus, GNN_minus
 
 from torchmetrics import MeanAbsolutePercentageError as MAPE
 from torchmetrics import MeanSquaredError as MSE
@@ -15,24 +15,22 @@ from torchmetrics import MeanSquaredLogError as MSLE
 # optuna.logging.set_verbosity(optuna.logging.WARNING)
 
 
-def hyperparameter_objective(trail: optuna.Trial, trainer: ModelTrainer) -> float:
-    trainer.model = GNN_plus().to(trainer.device)
+def hyperparameter_objective(trial: optuna.Trial, trainer: ModelTrainer) -> float:
+    trainer.model = GNN_minus().to(trainer.device)
     trainer.loss_metric = "All"
 
-    trainer.lr = trail.suggest_float("Learning_rate", 1e-9, 1e-5, log=True)
-    trainer.decay_rate = trail.suggest_float("Decay_rate", 1e-4, 0.1, step=1e-4)
-    trainer.batch_size = 2 ** trail.suggest_int("Batch_size", 9, 12)
-    epsilon = trail.suggest_float("Epsilon", 1e-7, 1e-4)
+    trainer.lr = trial.suggest_float("Learning_rate", 1e-9, 1e-5, log=True)
+    trainer.batch_size = 2 ** trial.suggest_int("Batch_size", 9, 12)
+    gamma = trial.suggest_float("Gamma", 1e-3, 0.5)
+    step_size = trial.suggest_int("Step size", 50, 150)
     trainer.loss_fn = MSE()
     trainer.reset_patience = 20
     trainer.patience = 50
     trainer.early_stopping = False
 
-    trainer.optimizer = torch.optim.Adam(
-        trainer.model.parameters(),
-        lr=trainer.lr,
-        eps=epsilon,
-        weight_decay=trainer.decay_rate,
+    trainer.optimizer = torch.optim.LBFGS(trainer.model.parameters(), lr=trainer.lr)
+    trainer.scheduler = torch.optim.lr_scheduler.StepLR(
+        trainer.optimizer, step_size=100, gamma=0.1
     )
 
     loss = trainer.train_model()
@@ -46,13 +44,13 @@ def optimize_model():
     now = datetime.now().strftime("%y_%m_%d_%H%M%S")
 
     model_trainer = ModelTrainer()
-    model_trainer.epochs = 1000
+    model_trainer.epochs = 300
     model_trainer.data_intervals = os.listdir("Data/datasets")
     model_trainer.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model_trainer.model = GNN().to(model_trainer.device)
+    model_trainer.model = GNN_minus().to(model_trainer.device)
     model_trainer.setup_data()
 
-    model_name = (model_trainer.model.__class__.__name__,)
+    model_name = model_trainer.model.__class__.__name__
 
     pruner = optuna.pruners.SuccessiveHalvingPruner()
 
@@ -65,7 +63,7 @@ def optimize_model():
 
     study.optimize(
         lambda trail: hyperparameter_objective(trail, model_trainer),
-        n_trials=50,
+        n_trials=100,
         gc_after_trial=True,
     )
 
