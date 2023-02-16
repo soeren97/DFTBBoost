@@ -41,6 +41,7 @@ class ModelTrainer:
 
         self.train_loader = None
         self.test_loader = None
+        self.valid_loader = None
         self.data_loader = None
         self.collate_fn = None
 
@@ -67,7 +68,9 @@ class ModelTrainer:
 
         self.data = CostumDataset(ml_method=model_name)
 
-        self.train_set, self.test_set = utils.random_split(self.data, [0.8, 0.2])
+        self.train_set, self.test_set, self.valid_set = utils.random_split(
+            self.data, [0.8, 0.1, 0.1]
+        )
 
     def evaluate_early_stopping(self, loss: torch.Tensor) -> None:
         if not self.best_loss >= loss:
@@ -173,9 +176,38 @@ class ModelTrainer:
 
         return loss
 
+    def validate(self) -> torch.Tensor:
+        self.model.eval()
+        for batch in self.valid_loader:
+            (
+                X,
+                Y_HOMO,
+                Y_LUMO,
+                Y_eigenvalues,
+                Y_matrices,
+                n_electrons,
+                n_orbitals,
+            ) = self.collate_fn(batch)
+
+            Y = [Y_HOMO, Y_LUMO, Y_eigenvalues, Y_matrices]
+
+            n_electrons.to(self.device)
+
+            n_orbitals.to(self.device)
+            if self.model.__class__.__name__ in ["GNN", "GNN_plus", "GNN_minus"]:
+                preds = self.model(X)
+
+            else:
+                preds = self.model(X.float())
+
+        loss = self.evaluate_loss(preds, n_electrons, n_orbitals, Y)
+
+        return loss
+
     def train_model(self) -> pd.DataFrame:
         losses_train = []
         losses_test = []
+        losses_valid = []
 
         self.train_loader = self.loader(
             self.train_set,
@@ -185,6 +217,12 @@ class ModelTrainer:
 
         self.test_loader = self.loader(
             self.test_set,
+            batch_size=self.batch_size,
+            shuffle=True,
+        )
+
+        self.valid_loader = self.loader(
+            self.valid_set,
             batch_size=self.batch_size,
             shuffle=True,
         )
@@ -202,6 +240,9 @@ class ModelTrainer:
             loss_test = self.test()
             losses_test.append(loss_test.cpu().detach())
 
+            loss_valid = self.validate()
+            losses_valid.append(loss_valid.cpu().detach())
+
             pbar.set_description(f"Test loss {loss_test:.2E}")
 
             self.evaluate_early_stopping(loss_test)
@@ -210,18 +251,22 @@ class ModelTrainer:
                 print(f" Best loss {self.best_loss}")
                 print(self.model_folder)
 
-                losses = np.array([losses_train, losses_test]).T
+                losses = np.array([losses_train, losses_test, losses_valid]).T
 
-                return pd.DataFrame(losses, columns=["Train_loss", "Test_loss"])
+                return pd.DataFrame(
+                    losses, columns=["Train_loss", "Test_loss", "Valid_loss"]
+                )
 
             elif self.early_stopping:
-                losses = np.array([losses_train, losses_test]).T
+                losses = np.array([losses_train, losses_test, losses_valid]).T
 
-                return pd.DataFrame(losses, columns=["Train_loss", "Test_loss"])
+                return pd.DataFrame(
+                    losses, columns=["Train_loss", "Test_loss", "Valid_loss"]
+                )
 
-        losses = np.array([losses_train, losses_test]).T
+        losses = np.array([losses_train, losses_test, losses_valid]).T
 
-        return pd.DataFrame(losses, columns=["Train_loss", "Test_loss"])
+        return pd.DataFrame(losses, columns=["Train_loss", "Test_loss", "Valid_loss"])
 
     def main(self) -> None:
         self.model_folder = "Models/m" + str(time.time())[:-8] + "/"

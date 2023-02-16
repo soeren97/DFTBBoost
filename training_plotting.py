@@ -59,6 +59,18 @@ class Plotter:
         if self.save:
             plt.savefig(self.path + "Loss.png")
 
+    def plot_valid_vs_test(self, loss: pd.DataFrame) -> None:
+        fig, ax = plt.subplots()
+        loss_valid = loss.Valid_loss
+        loss_test = loss.Test_loss
+        ax.scatter(loss_test, loss_valid)
+
+        plt.xlabel("Test loss [Ha]")
+        plt.ylabel("Validation loss [Ha]")
+        plt.tight_layout()
+
+        plt.savefig(self.path + "Valid_test.png")
+
     def main(self, path: str = None, save: bool = True) -> None:
         self.save = save
 
@@ -71,6 +83,8 @@ class Plotter:
         self.goal_line = config[f"dftb_dft_delta_{config['loss_metric']}"]
 
         self.plot_loss(losses)
+
+        self.plot_valid_vs_test(losses)
 
 
 if __name__ == "__main__":
