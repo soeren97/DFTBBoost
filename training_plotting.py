@@ -14,6 +14,7 @@ class Plotter:
         self.path = None
         self.save = False
         self.goal_line = None
+        self.goal_error = None
 
     def load_model_data(self) -> pd.DataFrame:
         if self.path == None:
@@ -38,13 +39,31 @@ class Plotter:
             label="Average dft-dftb error",
         )
 
+        ax.axhspan(
+            ymin=self.goal_line - self.goal_error,
+            ymax=self.goal_line + self.goal_error,
+            facecolor=".5",
+            alpha=0.3,
+            label="dft-dftb STD",
+        )
+
         zoomed_ax = ax.inset_axes([0.5, 0.3, 0.4, 0.45])
         zoomed_ax.plot(loss_train[-15:], color="dodgerblue")
         zoomed_ax.plot(loss_test[-15:], color="darkorange")
         zoomed_ax.axhline(
             y=self.goal_line, linestyle="dotted", alpha=0.5, color="black"
         )
-        zoomed_ax.set_ylim(bottom=0)
+
+        zoomed_ax.axvspan(
+            ymin=self.goal_line - self.goal_error,
+            ymax=self.goal_line + self.goal_error,
+            xmin=len(loss_test) - 15,
+            xmax=len(loss_test) - 1,
+            facecolor=".5",
+            alpha=0.3,
+        )
+
+        zoomed_ax.set_ylim(bottom=0, top=3)
 
         ax.indicate_inset_zoom(zoomed_ax, edgecolor="grey")
 
@@ -81,6 +100,8 @@ class Plotter:
         config = load_config(self.path)
 
         self.goal_line = config[f"dftb_dft_delta_{config['loss_metric']}"]
+
+        self.goal_error = config[f"dftb_dft_var_{config['loss_metric']}"]
 
         self.plot_loss(losses)
 
