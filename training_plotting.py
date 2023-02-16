@@ -101,7 +101,7 @@ class Plotter:
 
         self.goal_line = config[f"dftb_dft_delta_{config['loss_metric']}"]
 
-        self.goal_error = config[f"dftb_dft_var_{config['loss_metric']}"]
+        self.goal_error = config[f"dftb_dft_std_{config['loss_metric']}"]
 
         self.plot_loss(losses)
 

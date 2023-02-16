@@ -47,17 +47,17 @@ def compare_datasets(CONFIG):
     mean_delta_HOMO_LUMO = np.mean(delta_HOMO_LUMO)
     mean_distance = np.mean(delta_Matrix)
 
-    var_delta_all = np.var(delta_all)
-    var_delta_HOMO_LUMO = np.var(delta_HOMO_LUMO)
-    var_distance = np.var(delta_Matrix)
+    std_delta_all = np.std(delta_all)
+    std_delta_HOMO_LUMO = np.std(delta_HOMO_LUMO)
+    std_distance = np.std(delta_Matrix)
 
     CONFIG["dftb_dft_delta_All"] = float(mean_delta_all)
     CONFIG["dftb_dft_delta_HOMO_LUMO"] = float(mean_delta_HOMO_LUMO)
     CONFIG["dftb_dft_delta_Matrix"] = float(mean_distance)
 
-    CONFIG["dftb_dft_var_All"] = float(var_delta_all)
-    CONFIG["dftb_dft_var_HOMO_LUMO"] = float(var_delta_HOMO_LUMO)
-    CONFIG["dftb_dft_var_Matrix"] = float(var_distance)
+    CONFIG["dftb_dft_std_All"] = float(std_delta_all)
+    CONFIG["dftb_dft_std_HOMO_LUMO"] = float(std_delta_HOMO_LUMO)
+    CONFIG["dftb_dft_std_Matrix"] = float(std_distance)
 
     with open(r"model_config/config.yaml", "w") as config_file:
         updated_file = yaml.dump(CONFIG, config_file)
