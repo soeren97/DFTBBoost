@@ -19,18 +19,28 @@ def hyperparameter_objective(trial: optuna.Trial, trainer: ModelTrainer) -> floa
     trainer.model = GNN_minus().to(trainer.device)
     trainer.loss_metric = "All"
 
-    trainer.lr = trial.suggest_float("Learning_rate", 1e-9, 1e-5, log=True)
+    lr = trial.suggest_float("Learning_rate", 1e-9, 1e-5, log=True)
     trainer.batch_size = 2 ** trial.suggest_int("Batch_size", 9, 12)
-    gamma = trial.suggest_float("Gamma", 1e-3, 0.5)
-    step_size = trial.suggest_int("Step size", 50, 150)
+    beta1 = trial.suggest_float("Beta1", 0.8, 0.95)
+    beta2 = trial.suggest_float("Beta2", 0.951, 0.99999)
+    epsilon_optimizer = trial.suggest_float("Epsilon optimizer", 1e-10, 1e-6)
+    decay_rate = trial.suggest_float("Decay rate", 0.001, 0.01)
+
+    factor = trial.suggest_float("Factor", 1e-2, 0.5)
+    scheduler_patience = trial.suggest_int("Scheduler patience", 5, 15)
+    epsilon_scheduler = trial.suggest_float("Epsilon scheduler", 1e-10, 1e-6)
+
     trainer.loss_fn = MSE()
     trainer.reset_patience = 20
     trainer.patience = 50
     trainer.early_stopping = False
 
-    trainer.optimizer = torch.optim.LBFGS(trainer.model.parameters(), lr=trainer.lr)
-    trainer.scheduler = torch.optim.lr_scheduler.StepLR(
-        trainer.optimizer, step_size=100, gamma=0.1
+    trainer.optimizer = torch.optim.Adam(trainer.model.parameters(), lr=lr)
+    trainer.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+        trainer.optimizer,
+        factor=factor,
+        patience=scheduler_patience,
+        eps=epsilon_scheduler,
     )
 
     loss = trainer.train_model()
@@ -63,7 +73,7 @@ def optimize_model():
 
     study.optimize(
         lambda trail: hyperparameter_objective(trail, model_trainer),
-        n_trials=100,
+        n_trials=200,
         gc_after_trial=True,
     )
 
