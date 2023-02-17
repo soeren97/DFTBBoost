@@ -19,7 +19,7 @@ from torchmetrics import MeanSquaredLogError as MSLE
 from models import GNN, CNN, NN, GNN_plus, GNN_minus
 from CostumDataset import CostumDataset
 
-from typing import List
+from typing import List, Tuple
 
 
 class ModelTrainer:
@@ -110,7 +110,7 @@ class ModelTrainer:
 
         return loss
 
-    def closure(self, batch):
+    def closure(self, batch) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         self.optimizer.zero_grad()
         (
             X,
@@ -138,19 +138,19 @@ class ModelTrainer:
 
         loss.backward()
 
-        return loss
+        return loss, preds, Y
 
-    def train(self) -> torch.Tensor:
+    def train(self) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         self.model.train()
         for batch in self.train_loader:
 
             # loss = self.optimizer.step(lambda: self.closure(batch))
-            loss = self.closure(batch)
+            loss, preds, Y = self.closure(batch)
             self.optimizer.step()
 
-        return loss
+        return loss, preds, Y
 
-    def test(self) -> torch.Tensor:
+    def test(self) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         self.model.eval()
         for batch in self.test_loader:
             (
@@ -176,9 +176,9 @@ class ModelTrainer:
 
         loss = self.evaluate_loss(preds, n_electrons, n_orbitals, Y)
 
-        return loss
+        return loss, preds, Y
 
-    def validate(self) -> torch.Tensor:
+    def validate(self) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         self.model.eval()
         for batch in self.valid_loader:
             (
@@ -204,9 +204,9 @@ class ModelTrainer:
 
         loss = self.evaluate_loss(preds, n_electrons, n_orbitals, Y)
 
-        return loss
+        return loss, preds, Y
 
-    def train_model(self) -> pd.DataFrame:
+    def train_model(self) -> Tuple[pd.DataFrame, pd.DataFrame]:
         losses_train = []
         losses_test = []
         losses_valid = []
@@ -232,15 +232,15 @@ class ModelTrainer:
                 range(self.epochs), total=self.epochs, desc="Training", leave=False
             )
         ):
-            loss_train = self.train()
+            loss_train, preds_train, Y_train = self.train()
             losses_train.append(loss_train.cpu().detach())
 
             self.scheduler.step()
 
-            loss_test = self.test()
+            loss_test, preds_test, Y_test = self.test()
             losses_test.append(loss_test.cpu().detach())
 
-            loss_valid = self.validate()
+            loss_valid, preds_valid, Y_valid = self.validate()
             losses_valid.append(loss_valid.cpu().detach())
 
             pbar.set_description(f"Test loss {loss_test:.2E}")
@@ -253,8 +253,22 @@ class ModelTrainer:
 
                 losses = np.array([losses_train, losses_test, losses_valid]).T
 
+                preds_and_Y = np.array(
+                    [preds_train, Y_train, preds_test, Y_test, preds_valid, Y_valid]
+                ).T
+
                 return pd.DataFrame(
                     losses, columns=["Train_loss", "Test_loss", "Valid_loss"]
+                ), pd.DataFrame(
+                    preds_and_Y,
+                    columns=[
+                        "Train_preds",
+                        "Train_y",
+                        "Test_preds",
+                        "Test_y",
+                        "Valid_preds",
+                        "Valid_y",
+                    ],
                 )
 
             elif self.early_stopping:
@@ -262,11 +276,33 @@ class ModelTrainer:
 
                 return pd.DataFrame(
                     losses, columns=["Train_loss", "Test_loss", "Valid_loss"]
+                ), pd.DataFrame(
+                    preds_and_Y,
+                    columns=[
+                        "Train_preds",
+                        "Train_y",
+                        "Test_preds",
+                        "Test_y",
+                        "Valid_preds",
+                        "Valid_y",
+                    ],
                 )
 
         losses = np.array([losses_train, losses_test, losses_valid]).T
 
-        return pd.DataFrame(losses, columns=["Train_loss", "Test_loss", "Valid_loss"])
+        return pd.DataFrame(
+            losses, columns=["Train_loss", "Test_loss", "Valid_loss"]
+        ), pd.DataFrame(
+            preds_and_Y,
+            columns=[
+                "Train_preds",
+                "Train_y",
+                "Test_preds",
+                "Test_y",
+                "Valid_preds",
+                "Valid_y",
+            ],
+        )
 
     def main(self) -> None:
         self.model_folder = "Models/m" + str(time.time())[:-8] + "/"
@@ -298,10 +334,11 @@ class ModelTrainer:
 
         self.setup_data()
 
-        loss_df = self.train_model()
+        loss_df, pred_df = self.train_model()
 
         torch.save(self.model, self.model_folder + "model.pkl")
         loss_df.to_pickle(self.model_folder + "losses.pkl")
+        pred_df.to_pickle(self.model_folder + "predictions-pkl")
 
 
 if __name__ == "__main__":
