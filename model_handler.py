@@ -140,7 +140,7 @@ class ModelTrainer:
 
         return loss
 
-    def train(self) -> torch.Tensor:  # test new data
+    def train(self) -> torch.Tensor:
         self.model.train()
         for batch in self.train_loader:
 
