@@ -218,13 +218,11 @@ class ModelTrainer:
         self.test_loader = self.loader(
             self.test_set,
             batch_size=self.batch_size,
-            shuffle=True,
         )
 
         self.valid_loader = self.loader(
             self.valid_set,
             batch_size=self.batch_size,
-            shuffle=True,
         )
 
         for epoch in (
@@ -283,8 +281,8 @@ class ModelTrainer:
         self.loss_metric = config["loss_metric"]
 
         self.optimizer = torch.optim.LBFGS(self.model.parameters(), lr=self.lr)
-        self.scheduler = torch.optim.lr_scheduler.StepLR(
-            self.optimizer, step_size=100, gamma=0.1
+        self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+            self.optimizer,
         )
 
         self.loss_fn = eval(config["loss_fn"])().to(self.device)
