@@ -18,9 +18,9 @@ from torchmetrics import MeanSquaredLogError as MSLE
 def hyperparameter_objective(trial: optuna.Trial, trainer: ModelTrainer) -> float:
     trainer.model = GNN_minus().to(trainer.device)
     trainer.loss_metric = "All"
+    trainer.batch_size = 2048
 
     lr = trial.suggest_float("Learning_rate", 1e-9, 1e-5, log=True)
-    trainer.batch_size = 2 ** trial.suggest_int("Batch_size", 9, 12)
     beta1 = trial.suggest_float("Beta1", 0.8, 0.95)
     beta2 = trial.suggest_float("Beta2", 0.951, 0.99999)
     epsilon_optimizer = trial.suggest_float("Epsilon optimizer", 1e-10, 1e-6)
@@ -35,7 +35,13 @@ def hyperparameter_objective(trial: optuna.Trial, trainer: ModelTrainer) -> floa
     trainer.patience = 50
     trainer.early_stopping = False
 
-    trainer.optimizer = torch.optim.Adam(trainer.model.parameters(), lr=lr)
+    trainer.optimizer = torch.optim.Adam(
+        trainer.model.parameters(),
+        lr=lr,
+        betas=(beta1, beta2),
+        eps=epsilon_optimizer,
+        weight_decay=decay_rate,
+    )
     trainer.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
         trainer.optimizer,
         factor=factor,
@@ -43,7 +49,7 @@ def hyperparameter_objective(trial: optuna.Trial, trainer: ModelTrainer) -> floa
         eps=epsilon_scheduler,
     )
 
-    loss = trainer.train_model()
+    loss, _ = trainer.train_model()
 
     del trainer.model
 
