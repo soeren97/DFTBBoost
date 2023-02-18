@@ -3,7 +3,7 @@ import os
 import pandas as pd
 
 
-def extract_from_xyz(file_nr):
+def extract_from_xyz(file_nr: int) -> None:
 
     file_name = os.listdir(data_location)[file_nr]
 

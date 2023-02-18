@@ -11,10 +11,11 @@ import yaml
 from torch.utils.data.dataset import Subset, Dataset
 from torch_geometric.data import Batch
 
-from typing import Sequence, Union, Generator, List, Dict
+from typing import Sequence, Union, Generator, List, Dict, Tuple, Optional
+from numpy.typing import ArrayLike
 
 
-def load_config(path: str = None) -> Dict:
+def load_config(path: Optional[str] = None) -> Dict:
     """Function to load in configuration file for model.
     Used to easily change variables such as learning rate,
     loss function and such
@@ -82,7 +83,7 @@ def convert_tril(tril_tensor: torch.Tensor, n_orbitals: torch.Tensor) -> torch.T
 
 
 def find_eigenvalues_true(
-    hamiltonian: np.array, overlap: np.array, n_electrons: int
+    hamiltonian: ArrayLike, overlap: ArrayLike, n_electrons: int
 ) -> List:
     hamiltonian = torch.Tensor(hamiltonian)
 
@@ -111,8 +112,8 @@ def find_eigenvalues_true(
 
 
 def find_eigenvalues(
-    preds: torch.tensor, n_electrons: torch.Tensor, n_orbitals: torch.Tensor
-) -> torch.Tensor:
+    preds: torch.Tensor, n_electrons: torch.Tensor, n_orbitals: List[torch.Tensor]
+) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     n_electrons = n_electrons.numpy()
 
     # Convert tril tensors to full tensors

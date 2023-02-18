@@ -1,7 +1,7 @@
 import glob
 
 import pandas as pd
-from typing import Tuple
+from typing import List, Any
 
 import torch
 from torch.utils.data import Dataset
@@ -17,7 +17,7 @@ class CostumDataset(Dataset):
     def __len__(self) -> int:
         return len(self.file_names)
 
-    def __getitem__(self, index: int) -> Tuple:
+    def __getitem__(self, index: int) -> List[Any]:
         data = pd.read_pickle(self.file_names[index])
 
         X = data["X"].tolist()

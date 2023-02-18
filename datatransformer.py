@@ -18,7 +18,8 @@ import networkx as nx
 
 import utils
 
-from typing import Tuple, List
+from typing import Tuple, List, Union
+from numpy.typing import NDArray
 
 logging.getLogger("pysmiles").setLevel(logging.CRITICAL)  # Anything higher than warning
 
@@ -231,7 +232,9 @@ class DataTransformer:
 
         gc.collect()
 
-    def pad_and_tril(self, array: np.array) -> Tuple[torch.Tensor, torch.Tensor]:
+    def pad_and_tril(
+        self, array: NDArray
+    ) -> Union[Tuple[torch.Tensor, torch.Tensor], Tuple[None, None]]:
         tensor = torch.from_numpy(array)
 
         padding = self.max_dim - tensor.shape[0]
@@ -253,13 +256,13 @@ class DataTransformer:
             out.append(v.argmax())
         return np.asarray(out)
 
-    def pad_edge(self, edge: np.array) -> np.array:
+    def pad_edge(self, edge: NDArray) -> NDArray:
         padding = 3 - len(edge)
         edge = np.pad(edge, ((0, padding), (0, 0)), constant_values=0)
 
         return edge
 
-    def remove_diagonal(self, row: np.array, diagonal: np.array) -> np.array:
+    def remove_diagonal(self, row: NDArray, diagonal: NDArray) -> NDArray:
         """Delete the diagonal element from the row
 
         Args:
@@ -277,7 +280,7 @@ class DataTransformer:
         hamiltonian: torch.Tensor,
         overlap: torch.Tensor,
         bond_attributes,
-    ) -> Tuple[List[np.array], torch.Tensor, int]:
+    ) -> Tuple[List[NDArray], torch.Tensor, int]:
 
         atom_to_orbitals = {0: 1, 1: 4, 2: 4, 3: 4, 4: 4}
 
