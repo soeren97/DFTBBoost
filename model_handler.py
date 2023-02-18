@@ -235,10 +235,10 @@ class ModelTrainer:
             loss_train, preds_train, Y_train = self.train()
             losses_train.append(loss_train.cpu().detach())
 
-            self.scheduler.step()
-
             loss_test, preds_test, Y_test = self.test()
             losses_test.append(loss_test.cpu().detach())
+
+            self.scheduler.step(loss_test)
 
             loss_valid, preds_valid, Y_valid = self.validate()
             losses_valid.append(loss_valid.cpu().detach())
@@ -273,6 +273,9 @@ class ModelTrainer:
 
             elif self.early_stopping:
                 losses = np.array([losses_train, losses_test, losses_valid]).T
+                preds_and_Y = np.array(
+                    [preds_train, Y_train, preds_test, Y_test, preds_valid, Y_valid]
+                ).T
 
                 return pd.DataFrame(
                     losses, columns=["Train_loss", "Test_loss", "Valid_loss"]
@@ -289,6 +292,9 @@ class ModelTrainer:
                 )
 
         losses = np.array([losses_train, losses_test, losses_valid]).T
+        preds_and_Y = np.array(
+            [preds_train, Y_train, preds_test, Y_test, preds_valid, Y_valid]
+        ).T
 
         return pd.DataFrame(
             losses, columns=["Train_loss", "Test_loss", "Valid_loss"]
