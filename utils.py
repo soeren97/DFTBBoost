@@ -12,7 +12,7 @@ from torch.utils.data.dataset import Subset, Dataset
 from torch_geometric.data import Batch
 
 from typing import Sequence, Union, Generator, List, Dict, Tuple, Optional
-from numpy.typing import ArrayLike
+from numpy.typing import NDArray
 
 
 def load_config(path: Optional[str] = None) -> Dict:
@@ -83,7 +83,7 @@ def convert_tril(tril_tensor: torch.Tensor, n_orbitals: torch.Tensor) -> torch.T
 
 
 def find_eigenvalues_true(
-    hamiltonian: ArrayLike, overlap: ArrayLike, n_electrons: int
+    hamiltonian: NDArray, overlap: NDArray, n_electrons: int
 ) -> List:
     hamiltonian = torch.Tensor(hamiltonian)
 
@@ -182,3 +182,13 @@ def costume_collate_GNN(batch):
     n_orbitals = torch.stack(batch[6], dim=0).reshape(-1)
 
     return X, HOMO, LUMO, eigenvalues, ham_over, n_electrons, n_orbitals
+
+
+def extract_fock(matrix: NDArray) -> NDArray:
+    hf_matrix = matrix[:2145]
+    return np.array(hf_matrix)
+
+
+def extract_overlap(matrix: NDArray) -> NDArray:
+    overlap_matrix = matrix[2145:]
+    return np.array(overlap_matrix)
