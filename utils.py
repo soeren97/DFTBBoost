@@ -175,7 +175,7 @@ def costume_collate_GNN(batch):
 
     eigenvalues = torch.stack(batch[3], dim=0).reshape(-1, 65)
 
-    ham_over = torch.stack(batch[4], dim=0).reshape(-1, 2145)
+    ham_over = torch.stack(batch[4], dim=0).reshape(-1, 2145 * 2)
 
     n_electrons = torch.stack(batch[5], dim=0).reshape(-1)
 

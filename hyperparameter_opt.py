@@ -49,7 +49,7 @@ def hyperparameter_objective(trial: optuna.Trial, trainer: ModelTrainer) -> floa
         eps=epsilon_scheduler,
     )
 
-    loss, _ = trainer.train_model()
+    loss, _, _, _ = trainer.train_model()
 
     del trainer.model
 
