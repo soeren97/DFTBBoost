@@ -276,9 +276,9 @@ class ModelTrainer:
 
         torch.save(self.model, model_folder + "model.pkl")
         loss_df.to_pickle(model_folder + "losses.pkl")
-        pred_train.to_pickle(model_folder + "predictions_train.pkl")
-        pred_test.to_pickle(model_folder + "predictions_test.pkl")
-        pred_valid.to_pickle(model_folder + "predictions_valid.pkl")
+        pred_train.to_pickle(model_folder + "predictions/train.pkl")
+        pred_test.to_pickle(model_folder + "predictions/test.pkl")
+        pred_valid.to_pickle(model_folder + "predictions/valid.pkl")
         print(model_folder)
 
 
