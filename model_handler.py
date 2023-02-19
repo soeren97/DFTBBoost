@@ -107,7 +107,9 @@ class ModelTrainer:
 
         return loss
 
-    def closure(self, batch) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    def closure(
+        self, batch
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         (
             X,
             Y_HOMO,
@@ -134,31 +136,31 @@ class ModelTrainer:
 
         loss.backward()
 
-        return loss, preds, Y_matrices
+        return loss, preds, Y_matrices, n_orbitals
 
-    def train(self) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    def train(self) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         self.optimizer.zero_grad()
         self.model.train()
         for batch in self.train_loader:
             # loss = self.optimizer.step(lambda: self.closure(batch))
-            loss, preds, Y_matrices = self.closure(batch)
+            loss, preds, Y_matrices, n_orbitals = self.closure(batch)
             self.optimizer.step()
 
-        return loss, preds, Y_matrices
+        return loss, preds, Y_matrices, n_orbitals
 
-    def test(self) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    def test(self) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         self.model.eval()
         for batch in self.test_loader:
-            loss, preds, Y_matrices = self.closure(batch)
+            loss, preds, Y_matrices, n_orbitals = self.closure(batch)
 
-        return loss, preds, Y_matrices
+        return loss, preds, Y_matrices, n_orbitals
 
-    def validate(self) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    def validate(self) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         self.model.eval()
         for batch in self.valid_loader:
-            loss, preds, Y_matrices = self.closure(batch)
+            loss, preds, Y_matrices, n_orbitals = self.closure(batch)
 
-        return loss, preds, Y_matrices
+        return loss, preds, Y_matrices, n_orbitals
 
     def train_model(
         self,
@@ -166,12 +168,17 @@ class ModelTrainer:
         losses_train = []
         preds_train = []
         ys_train = []
+        n_orbitals_train = []
+
         losses_test = []
         preds_test = []
         ys_test = []
+        n_orbitals_test = []
+
         losses_valid = []
         preds_valid = []
         ys_valid = []
+        n_orbitals_valid = []
 
         self.train_loader = self.loader(
             self.train_set,
@@ -194,22 +201,25 @@ class ModelTrainer:
                 range(self.epochs), total=self.epochs, desc="Training", leave=False
             )
         ):
-            loss_train, pred_train, Y_train = self.train()
+            loss_train, pred_train, Y_train, n_orbitals = self.train()
             losses_train.append(loss_train.cpu().detach())
             preds_train.append(pred_train.cpu().detach().numpy())
             ys_train.append(Y_train.cpu().detach().numpy())
+            n_orbitals_train.extend(n_orbitals.cpu().detach())
 
-            loss_test, pred_test, Y_test = self.test()
+            loss_test, pred_test, Y_test, n_orbitals = self.test()
             losses_test.append(loss_test.cpu().detach())
             preds_test.append(pred_test.cpu().detach().numpy())
             ys_test.append(Y_test.cpu().detach().numpy())
+            n_orbitals_test.extend(n_orbitals.cpu().detach())
 
             self.scheduler.step(loss_test)
 
-            loss_valid, pred_valid, Y_valid = self.validate()
+            loss_valid, pred_valid, Y_valid, n_orbitals = self.validate()
             losses_valid.append(loss_valid.cpu().detach())
             preds_valid.append(pred_valid.cpu().detach().numpy())
             ys_valid.append(Y_valid.cpu().detach().numpy())
+            n_orbitals_valid.extend(n_orbitals.cpu().detach())
 
             pbar.set_description(f"Test loss {loss_test:.2E}")
 
@@ -222,30 +232,58 @@ class ModelTrainer:
                     pd.DataFrame(
                         losses, columns=["Train_loss", "Test_loss", "Valid_loss"]
                     ),
-                    pd.DataFrame({"pred": preds_train, "y": ys_train}),
-                    pd.DataFrame({"pred": preds_test, "y": ys_test}),
-                    pd.DataFrame({"pred": preds_valid, "y": ys_valid}),
+                    pd.DataFrame(
+                        {
+                            "pred": np.vstack(preds_train).tolist(),
+                            "y": np.vstack(ys_train).tolist(),
+                            "n_orbitals": n_orbitals_train,
+                        }
+                    ),
+                    pd.DataFrame(
+                        {
+                            "pred": np.vstack(preds_test).tolist(),
+                            "y": np.vstack(ys_test).tolist(),
+                            "n_orbitals": n_orbitals_test,
+                        }
+                    ),
+                    pd.DataFrame(
+                        {
+                            "pred": np.vstack(preds_valid).tolist(),
+                            "y": np.vstack(ys_valid).tolist(),
+                            "n_orbitals": n_orbitals_valid,
+                        }
+                    ),
                 )
 
         losses = np.array([losses_train, losses_test, losses_valid]).T
 
-        preds_and_Y_train = np.array([preds_train, ys_train]).T
-
-        preds_and_Y_test = np.array([preds_test, ys_test]).T
-
-        preds_and_Y_valid = np.array([preds_valid, ys_valid]).T
-
         return (
             pd.DataFrame(losses, columns=["Train_loss", "Test_loss", "Valid_loss"]),
-            pd.DataFrame(preds_and_Y_train, columns=["preds", "y"]),
-            pd.DataFrame(preds_and_Y_test, columns=["preds", "y"]),
-            pd.DataFrame(preds_and_Y_valid, columns=["preds", "y"]),
+            pd.DataFrame(
+                {
+                    "pred": np.vstack(preds_train).tolist(),
+                    "y": np.vstack(ys_train).tolist(),
+                }
+            ),
+            pd.DataFrame(
+                {
+                    "pred": np.vstack(preds_test).tolist(),
+                    "y": np.vstack(ys_test).tolist(),
+                }
+            ),
+            pd.DataFrame(
+                {
+                    "pred": np.vstack(preds_valid).tolist(),
+                    "y": np.vstack(ys_valid).tolist(),
+                }
+            ),
         )
 
     def main(self) -> None:
         model_folder = "Models/m" + str(time.time())[:-8] + "/"
 
         os.mkdir(model_folder)
+        os.mkdir(model_folder + "predictions/")
         shutil.copy("model_config/config.yaml", model_folder + "config.yaml")
 
         config = utils.load_config()
