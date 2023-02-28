@@ -85,31 +85,38 @@ class ModelTrainer:
         n_electrons: torch.Tensor,
         n_orbitals: torch.Tensor,
         true: List[torch.Tensor],
-    ) -> torch.Tensor:
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
 
         # Calculate eigenvalues
         eigenvalues, HOMO, LUMO = utils.find_eigenvalues(preds, n_electrons, n_orbitals)
 
         if self.loss_metric == "HOMO_LUMO":
             predicted = torch.stack([HOMO, LUMO])
-            true = torch.stack(true[:2])
+            truth = torch.stack(true[:2])
 
         elif self.loss_metric == "All":
             predicted = eigenvalues
-            true = true[2]
+            truth = true[2]
 
         else:
             # TODO: Does not work, take from find_eigenvalues as it already zero out unwanted orbitals
             predicted = utils.zero_prediction_padding(preds, n_orbitals)
-            true = true[3]
+            truth = true[3]
 
-        loss = self.loss_fn(predicted, true)
+        loss = self.loss_fn(predicted, truth)
 
-        return loss
+        return loss, eigenvalues, true[2]
 
     def closure(
         self, batch
-    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+    ) -> Tuple[
+        torch.Tensor,
+        torch.Tensor,
+        torch.Tensor,
+        torch.Tensor,
+        torch.Tensor,
+        torch.Tensor,
+    ]:
         (
             X,
             Y_HOMO,
@@ -132,35 +139,85 @@ class ModelTrainer:
         else:
             preds = self.model(X.float())
 
-        loss = self.evaluate_loss(preds, n_electrons, n_orbitals, Y)
+        loss, pred_energy, true_energy = self.evaluate_loss(
+            preds, n_electrons, n_orbitals, Y
+        )
 
         loss.backward()
 
-        return loss, preds, Y_matrices, n_orbitals
+        return loss, preds, Y_matrices, n_orbitals, pred_energy, true_energy
 
-    def train(self) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+    def train(
+        self,
+    ) -> Tuple[
+        torch.Tensor,
+        torch.Tensor,
+        torch.Tensor,
+        torch.Tensor,
+        torch.Tensor,
+        torch.Tensor,
+    ]:
         self.optimizer.zero_grad()
         self.model.train()
         for batch in self.train_loader:
             # loss = self.optimizer.step(lambda: self.closure(batch))
-            loss, preds, Y_matrices, n_orbitals = self.closure(batch)
+            (
+                loss,
+                preds,
+                Y_matrices,
+                n_orbitals,
+                pred_energy,
+                true_energy,
+            ) = self.closure(batch)
             self.optimizer.step()
 
-        return loss, preds, Y_matrices, n_orbitals
+        return loss, preds, Y_matrices, n_orbitals, pred_energy, true_energy
 
-    def test(self) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+    def test(
+        self,
+    ) -> Tuple[
+        torch.Tensor,
+        torch.Tensor,
+        torch.Tensor,
+        torch.Tensor,
+        torch.Tensor,
+        torch.Tensor,
+    ]:
         self.model.eval()
         for batch in self.test_loader:
-            loss, preds, Y_matrices, n_orbitals = self.closure(batch)
+            (
+                loss,
+                preds,
+                Y_matrices,
+                n_orbitals,
+                pred_energy,
+                true_energy,
+            ) = self.closure(batch)
 
-        return loss, preds, Y_matrices, n_orbitals
+        return loss, preds, Y_matrices, n_orbitals, pred_energy, true_energy
 
-    def validate(self) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+    def validate(
+        self,
+    ) -> Tuple[
+        torch.Tensor,
+        torch.Tensor,
+        torch.Tensor,
+        torch.Tensor,
+        torch.Tensor,
+        torch.Tensor,
+    ]:
         self.model.eval()
         for batch in self.valid_loader:
-            loss, preds, Y_matrices, n_orbitals = self.closure(batch)
+            (
+                loss,
+                preds,
+                Y_matrices,
+                n_orbitals,
+                pred_energy,
+                true_energy,
+            ) = self.closure(batch)
 
-        return loss, preds, Y_matrices, n_orbitals
+        return loss, preds, Y_matrices, n_orbitals, pred_energy, true_energy
 
     def train_model(
         self,
@@ -169,16 +226,22 @@ class ModelTrainer:
         preds_train = []
         ys_train = []
         n_orbitals_train = []
+        pred_energies_train = []
+        true_energies_train = []
 
         losses_test = []
         preds_test = []
         ys_test = []
         n_orbitals_test = []
+        pred_energies_test = []
+        true_energies_test = []
 
         losses_valid = []
         preds_valid = []
         ys_valid = []
         n_orbitals_valid = []
+        pred_energies_valid = []
+        true_energies_valid = []
 
         self.train_loader = self.loader(
             self.train_set,
@@ -201,25 +264,52 @@ class ModelTrainer:
                 range(self.epochs), total=self.epochs, desc="Training", leave=False
             )
         ):
-            loss_train, pred_train, Y_train, n_orbitals = self.train()
+            (
+                loss_train,
+                pred_train,
+                Y_train,
+                n_orbitals,
+                pred_energy_train,
+                Y_energy_train,
+            ) = self.train()
             losses_train.append(loss_train.cpu().detach())
             preds_train.append(pred_train.cpu().detach().numpy())
             ys_train.append(Y_train.cpu().detach().numpy())
             n_orbitals_train.extend(n_orbitals.cpu().detach())
+            pred_energies_train.append(pred_energy_train.cpu().detach())
+            true_energies_train.append(Y_energy_train.cpu().detach())
 
-            loss_test, pred_test, Y_test, n_orbitals = self.test()
+            (
+                loss_test,
+                pred_test,
+                Y_test,
+                n_orbitals,
+                pred_energy_test,
+                Y_energy_test,
+            ) = self.test()
             losses_test.append(loss_test.cpu().detach())
             preds_test.append(pred_test.cpu().detach().numpy())
             ys_test.append(Y_test.cpu().detach().numpy())
             n_orbitals_test.extend(n_orbitals.cpu().detach())
+            pred_energies_test.append(pred_energy_test.cpu().detach())
+            true_energies_test.append(Y_energy_test.cpu().detach())
 
             self.scheduler.step(loss_test)
 
-            loss_valid, pred_valid, Y_valid, n_orbitals = self.validate()
+            (
+                loss_valid,
+                pred_valid,
+                Y_valid,
+                n_orbital,
+                pred_energy_valid,
+                Y_energy_valid,
+            ) = self.validate()
             losses_valid.append(loss_valid.cpu().detach())
             preds_valid.append(pred_valid.cpu().detach().numpy())
             ys_valid.append(Y_valid.cpu().detach().numpy())
             n_orbitals_valid.extend(n_orbitals.cpu().detach())
+            pred_energies_valid.append(pred_energy_valid.cpu().detach())
+            true_energies_valid.append(Y_energy_valid.cpu().detach())
 
             pbar.set_description(f"Test loss {loss_test:.2E}")
 
@@ -237,6 +327,8 @@ class ModelTrainer:
                             "pred": np.vstack(preds_train).tolist(),
                             "y": np.vstack(ys_train).tolist(),
                             "n_orbitals": n_orbitals_train,
+                            "energy_pred": pred_energies_train,
+                            "energy_y": true_energies_train,
                         }
                     ),
                     pd.DataFrame(
@@ -244,6 +336,8 @@ class ModelTrainer:
                             "pred": np.vstack(preds_test).tolist(),
                             "y": np.vstack(ys_test).tolist(),
                             "n_orbitals": n_orbitals_test,
+                            "energy_pred": pred_energies_test,
+                            "energy_y": true_energies_test,
                         }
                     ),
                     pd.DataFrame(
@@ -251,6 +345,8 @@ class ModelTrainer:
                             "pred": np.vstack(preds_valid).tolist(),
                             "y": np.vstack(ys_valid).tolist(),
                             "n_orbitals": n_orbitals_valid,
+                            "energy_pred": pred_energies_valid,
+                            "energy_y": true_energies_valid,
                         }
                     ),
                 )
