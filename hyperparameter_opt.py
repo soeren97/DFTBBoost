@@ -18,7 +18,7 @@ from torchmetrics import MeanSquaredLogError as MSLE
 def hyperparameter_objective(trial: optuna.Trial, trainer: ModelTrainer) -> float:
     trainer.model = GNN_minus().to(trainer.device)
     trainer.loss_metric = "All"
-    trainer.batch_size = 2048
+    trainer.batch_size = int(2048 / 32)
 
     lr = trial.suggest_float("Learning_rate", 1e-9, 1e-5, log=True)
     beta1 = trial.suggest_float("Beta1", 0.8, 0.95)
@@ -26,13 +26,11 @@ def hyperparameter_objective(trial: optuna.Trial, trainer: ModelTrainer) -> floa
     epsilon_optimizer = trial.suggest_float("Epsilon optimizer", 1e-10, 1e-6)
     decay_rate = trial.suggest_float("Decay rate", 0.001, 0.01)
 
-    factor = trial.suggest_float("Factor", 1e-2, 0.5)
-    scheduler_patience = trial.suggest_int("Scheduler patience", 5, 15)
-    epsilon_scheduler = trial.suggest_float("Epsilon scheduler", 1e-10, 1e-6)
+    scheduler_patience = 5
 
     trainer.loss_fn = MSE()
     trainer.reset_patience = 20
-    trainer.patience = 50
+    trainer.patience = 20
     trainer.early_stopping = False
 
     trainer.optimizer = torch.optim.Adam(
@@ -44,20 +42,18 @@ def hyperparameter_objective(trial: optuna.Trial, trainer: ModelTrainer) -> floa
     )
     trainer.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
         trainer.optimizer,
-        factor=factor,
         patience=scheduler_patience,
-        eps=epsilon_scheduler,
     )
 
-    loss, _, _, _ = trainer.train_model()
+    loss = trainer.train_model()
 
     del trainer.model
 
-    return loss.iloc[0, -1]
+    return loss["Test_loss"].iloc[-1]
 
 
 def optimize_model():
-    now = datetime.now().strftime("%y_%m_%d_%H%M%S")
+    now = datetime.now().strftime("%y_%m_%d_%H_%M_%S")
 
     model_trainer = ModelTrainer()
     model_trainer.epochs = 300
@@ -71,15 +67,15 @@ def optimize_model():
     pruner = optuna.pruners.SuccessiveHalvingPruner()
 
     # storage = optuna.storages.RDBStorage(f'/Optuna/studies/{now}.db')
-    # storage = f"sqlite:///Optuna/studies/{now}.db"
+    storage = f"sqlite:///Optuna/studies/{now}.db"
 
     study = optuna.create_study(
-        direction="minimize", pruner=pruner, study_name=model_name
+        direction="minimize", pruner=pruner, study_name=model_name, storage=storage
     )
 
     study.optimize(
         lambda trail: hyperparameter_objective(trail, model_trainer),
-        n_trials=200,
+        n_trials=100,
         gc_after_trial=True,
     )
 
