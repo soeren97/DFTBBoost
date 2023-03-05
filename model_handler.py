@@ -53,6 +53,9 @@ class ModelTrainer:
         self.test_set = None
         self.valid_set = None
 
+        self.folder = None
+        self.save = False
+
     def setup_data(self) -> None:
         model_name = self.model.__class__.__name__
 
@@ -65,8 +68,11 @@ class ModelTrainer:
 
         self.data = CostumDataset(ml_method=model_name)
 
+        # Ensures same split each time
+        generator = torch.Generator().manual_seed(42)
+
         self.train_set, self.test_set, self.valid_set = utils.random_split(
-            self.data, [0.8, 0.1, 0.1]
+            self.data, [0.8, 0.1, 0.1], generator=generator
         )
 
     def evaluate_early_stopping(self, loss: torch.Tensor) -> None:
@@ -149,14 +155,7 @@ class ModelTrainer:
 
     def train(
         self,
-    ) -> Tuple[
-        torch.Tensor,
-        torch.Tensor,
-        torch.Tensor,
-        torch.Tensor,
-        torch.Tensor,
-        torch.Tensor,
-    ]:
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor,]:
         self.optimizer.zero_grad()
         self.model.train()
         for batch in self.train_loader:
@@ -171,18 +170,11 @@ class ModelTrainer:
             ) = self.closure(batch)
             self.optimizer.step()
 
-        return loss, preds, Y_matrices, n_orbitals, pred_energy, true_energy
+        return loss, preds, Y_matrices, pred_energy, true_energy
 
     def test(
         self,
-    ) -> Tuple[
-        torch.Tensor,
-        torch.Tensor,
-        torch.Tensor,
-        torch.Tensor,
-        torch.Tensor,
-        torch.Tensor,
-    ]:
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor,]:
         self.model.eval()
         for batch in self.test_loader:
             (
@@ -194,18 +186,11 @@ class ModelTrainer:
                 true_energy,
             ) = self.closure(batch)
 
-        return loss, preds, Y_matrices, n_orbitals, pred_energy, true_energy
+        return loss, preds, Y_matrices, pred_energy, true_energy
 
     def validate(
         self,
-    ) -> Tuple[
-        torch.Tensor,
-        torch.Tensor,
-        torch.Tensor,
-        torch.Tensor,
-        torch.Tensor,
-        torch.Tensor,
-    ]:
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor,]:
         self.model.eval()
         for batch in self.valid_loader:
             (
@@ -217,7 +202,7 @@ class ModelTrainer:
                 true_energy,
             ) = self.closure(batch)
 
-        return loss, preds, Y_matrices, n_orbitals, pred_energy, true_energy
+        return loss, preds, Y_matrices, pred_energy, true_energy
 
     def train_model(
         self,
@@ -225,21 +210,18 @@ class ModelTrainer:
         losses_train = []
         preds_train = []
         ys_train = []
-        n_orbitals_train = []
         pred_energies_train = []
         true_energies_train = []
 
         losses_test = []
         preds_test = []
         ys_test = []
-        n_orbitals_test = []
         pred_energies_test = []
         true_energies_test = []
 
         losses_valid = []
         preds_valid = []
         ys_valid = []
-        n_orbitals_valid = []
         pred_energies_valid = []
         true_energies_valid = []
 
@@ -266,33 +248,21 @@ class ModelTrainer:
         ):
             (
                 loss_train,
-                pred_train,
-                Y_train,
-                n_orbitals,
-                pred_energy_train,
-                Y_energy_train,
+                _,  # pred_train,
+                _,  # Y_train,
+                _,  # pred_energy_train,
+                _,  # Y_energy_train,
             ) = self.train()
             losses_train.append(loss_train.cpu().detach())
-            preds_train.append(pred_train.cpu().detach().numpy())
-            ys_train.append(Y_train.cpu().detach().numpy())
-            n_orbitals_train.extend(n_orbitals.cpu().detach())
-            pred_energies_train.append(pred_energy_train.cpu().detach())
-            true_energies_train.append(Y_energy_train.cpu().detach())
 
             (
                 loss_test,
                 pred_test,
                 Y_test,
-                n_orbitals,
                 pred_energy_test,
                 Y_energy_test,
             ) = self.test()
             losses_test.append(loss_test.cpu().detach())
-            preds_test.append(pred_test.cpu().detach().numpy())
-            ys_test.append(Y_test.cpu().detach().numpy())
-            n_orbitals_test.extend(n_orbitals.cpu().detach())
-            pred_energies_test.append(pred_energy_test.cpu().detach())
-            true_energies_test.append(Y_energy_test.cpu().detach())
 
             self.scheduler.step(loss_test)
 
@@ -300,16 +270,24 @@ class ModelTrainer:
                 loss_valid,
                 pred_valid,
                 Y_valid,
-                n_orbital,
                 pred_energy_valid,
                 Y_energy_valid,
             ) = self.validate()
             losses_valid.append(loss_valid.cpu().detach())
-            preds_valid.append(pred_valid.cpu().detach().numpy())
-            ys_valid.append(Y_valid.cpu().detach().numpy())
-            n_orbitals_valid.extend(n_orbitals.cpu().detach())
-            pred_energies_valid.append(pred_energy_valid.cpu().detach())
-            true_energies_valid.append(Y_energy_valid.cpu().detach())
+
+            if self.save:
+                # preds_train.append(pred_train.cpu().detach().numpy())
+                # ys_train.append(Y_train.cpu().detach().numpy())
+                # pred_energies_train.append(pred_energy_train.cpu().detach())
+                # true_energies_train.append(Y_energy_train.cpu().detach())
+                preds_test.append(pred_test.cpu().detach().numpy())
+                ys_test.append(Y_test.cpu().detach().numpy())
+                pred_energies_test.append(pred_energy_test.cpu().detach())
+                true_energies_test.append(Y_energy_test.cpu().detach())
+                preds_valid.append(pred_valid.cpu().detach().numpy())
+                ys_valid.append(Y_valid.cpu().detach().numpy())
+                pred_energies_valid.append(pred_energy_valid.cpu().detach())
+                true_energies_valid.append(Y_energy_valid.cpu().detach())
 
             pbar.set_description(f"Test loss {loss_test:.2E}")
 
@@ -317,66 +295,101 @@ class ModelTrainer:
 
             if self.early_stopping:
                 losses = np.array([losses_train, losses_test, losses_valid]).T
-
-                return (
-                    pd.DataFrame(
-                        losses, columns=["Train_loss", "Test_loss", "Valid_loss"]
-                    ),
-                    pd.DataFrame(
-                        {
-                            "pred": np.vstack(preds_train).tolist(),
-                            "y": np.vstack(ys_train).tolist(),
-                            "n_orbitals": n_orbitals_train,
-                            "energy_pred": pred_energies_train,
-                            "energy_y": true_energies_train,
-                        }
-                    ),
-                    pd.DataFrame(
+                if self.save:
+                    pred_test = pd.DataFrame(
                         {
                             "pred": np.vstack(preds_test).tolist(),
                             "y": np.vstack(ys_test).tolist(),
-                            "n_orbitals": n_orbitals_test,
-                            "energy_pred": pred_energies_test,
-                            "energy_y": true_energies_test,
+                            "energy_pred": np.vstack(pred_energies_test).tolist(),
+                            "energy_true": np.vstack(true_energies_test).tolist(),
                         }
-                    ),
-                    pd.DataFrame(
+                    )
+
+                    pred_test.to_pickle(self.folder + "predictions/test.pkl")
+
+                    del pred_test, preds_test, ys_test
+
+                    pred_valid = pd.DataFrame(
                         {
                             "pred": np.vstack(preds_valid).tolist(),
                             "y": np.vstack(ys_valid).tolist(),
-                            "n_orbitals": n_orbitals_valid,
-                            "energy_pred": pred_energies_valid,
-                            "energy_y": true_energies_valid,
+                            "energy_pred": np.vstack(pred_energies_valid).tolist(),
+                            "energy_true": np.vstack(true_energies_valid).tolist(),
                         }
-                    ),
+                    )
+
+                    pred_valid.to_pickle(self.folder + "predictions/valid.pkl")
+
+                    del pred_valid, preds_valid, ys_valid
+
+                    # pred_train = pd.DataFrame()
+
+                    # pred_train_series = pd.Series(np.vstack(preds_train).tolist())
+
+                    # pred_train["pred"] = pred_train_series
+
+                    # del preds_train, pred_train_series
+
+                    # pred_train_series_y = pd.Series(np.vstack(ys_train).tolist())
+
+                    # pred_train["y"] = pred_train_series_y
+
+                    # del ys_train, pred_train_series_y
+
+                    # pred_train.to_pickle(self.folder + "predictions/train.pkl")
+                    # del pred_train
+
+                return pd.DataFrame(
+                    losses, columns=["Train_loss", "Test_loss", "Valid_loss"]
                 )
 
         losses = np.array([losses_train, losses_test, losses_valid]).T
-
-        return (
-            pd.DataFrame(losses, columns=["Train_loss", "Test_loss", "Valid_loss"]),
-            pd.DataFrame(
-                {
-                    "pred": np.vstack(preds_train).tolist(),
-                    "y": np.vstack(ys_train).tolist(),
-                }
-            ),
-            pd.DataFrame(
+        if self.save:
+            pred_test = pd.DataFrame(
                 {
                     "pred": np.vstack(preds_test).tolist(),
                     "y": np.vstack(ys_test).tolist(),
                 }
-            ),
-            pd.DataFrame(
+            )
+
+            pred_test.to_pickle(self.folder + "predictions/test.pkl")
+
+            del pred_test, preds_test, ys_test
+
+            pred_valid = pd.DataFrame(
                 {
                     "pred": np.vstack(preds_valid).tolist(),
                     "y": np.vstack(ys_valid).tolist(),
                 }
-            ),
-        )
+            )
+
+            pred_valid.to_pickle(self.folder + "predictions/valid.pkl")
+
+            del pred_valid, preds_valid, ys_valid
+
+            # pred_train = pd.DataFrame()
+
+            # pred_train_series = pd.Series(np.vstack(preds_train).tolist())
+
+            # pred_train["pred"] = pred_train_series
+
+            # del preds_train, pred_train_series
+
+            # pred_train_series_y = pd.Series(np.vstack(ys_train).tolist())
+
+            # pred_train["y"] = pred_train_series_y
+
+            # del ys_train, pred_train_series_y
+
+            # pred_train.to_pickle(self.folder + "predictions/train.pkl")
+            # del pred_train
+
+        return pd.DataFrame(losses, columns=["Train_loss", "Test_loss", "Valid_loss"])
 
     def main(self) -> None:
         model_folder = "Models/m" + str(time.time())[:-8] + "/"
+
+        print(model_folder)
 
         os.mkdir(model_folder)
         os.mkdir(model_folder + "predictions/")
@@ -390,6 +403,9 @@ class ModelTrainer:
         self.reset_patience = config["start_patience"]
         self.model = eval(config["model"])().to(self.device)
         self.loss_metric = config["loss_metric"]
+
+        self.save = True
+        self.folder = model_folder
 
         # self.optimizer = torch.optim.LBFGS(self.model.parameters(), lr=self.lr)
         self.optimizer = torch.optim.Adam(
@@ -406,14 +422,11 @@ class ModelTrainer:
 
         self.setup_data()
 
-        loss_df, pred_train, pred_test, pred_valid = self.train_model()
+        loss_df = self.train_model()
 
         torch.save(self.model, model_folder + "model.pkl")
+
         loss_df.to_pickle(model_folder + "losses.pkl")
-        pred_train.to_pickle(model_folder + "predictions/train.pkl")
-        pred_test.to_pickle(model_folder + "predictions/test.pkl")
-        pred_valid.to_pickle(model_folder + "predictions/valid.pkl")
-        print(model_folder)
 
 
 if __name__ == "__main__":
