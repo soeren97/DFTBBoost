@@ -49,9 +49,6 @@ class ModelTrainer:
         self.scheduler = None
 
         self.data = None
-        self.train_set = None
-        self.test_set = None
-        self.valid_set = None
 
         self.folder = None
         self.save = False
@@ -71,8 +68,24 @@ class ModelTrainer:
         # Ensures same split each time
         generator = torch.Generator().manual_seed(42)
 
-        self.train_set, self.test_set, self.valid_set = utils.random_split(
+        train_set, test_set, valid_set = utils.random_split(
             self.data, [0.8, 0.1, 0.1], generator=generator
+        )
+
+        self.train_loader = self.loader(
+            train_set,
+            batch_size=self.batch_size,
+            shuffle=True,
+        )
+
+        self.test_loader = self.loader(
+            test_set,
+            batch_size=self.batch_size,
+        )
+
+        self.valid_loader = self.loader(
+            valid_set,
+            batch_size=self.batch_size,
         )
 
     def evaluate_early_stopping(self, loss: torch.Tensor) -> None:
@@ -224,22 +237,6 @@ class ModelTrainer:
         ys_valid = []
         pred_energies_valid = []
         true_energies_valid = []
-
-        self.train_loader = self.loader(
-            self.train_set,
-            batch_size=self.batch_size,
-            shuffle=True,
-        )
-
-        self.test_loader = self.loader(
-            self.test_set,
-            batch_size=self.batch_size,
-        )
-
-        self.valid_loader = self.loader(
-            self.valid_set,
-            batch_size=self.batch_size,
-        )
 
         for epoch in (
             pbar := tqdm(
