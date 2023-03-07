@@ -221,22 +221,10 @@ class ModelTrainer:
         self,
     ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
         losses_train = []
-        preds_train = []
-        ys_train = []
-        pred_energies_train = []
-        true_energies_train = []
 
         losses_test = []
-        preds_test = []
-        ys_test = []
-        pred_energies_test = []
-        true_energies_test = []
 
         losses_valid = []
-        preds_valid = []
-        ys_valid = []
-        pred_energies_valid = []
-        true_energies_valid = []
 
         for epoch in (
             pbar := tqdm(
@@ -245,10 +233,10 @@ class ModelTrainer:
         ):
             (
                 loss_train,
-                _,  # pred_train,
-                _,  # Y_train,
-                _,  # pred_energy_train,
-                _,  # Y_energy_train,
+                pred_train,
+                Y_train,
+                pred_energy_train,
+                Y_energy_train,
             ) = self.train()
             losses_train.append(loss_train.cpu().detach())
 
@@ -272,20 +260,6 @@ class ModelTrainer:
             ) = self.validate()
             losses_valid.append(loss_valid.cpu().detach())
 
-            if self.save:
-                # preds_train.append(pred_train.cpu().detach().numpy())
-                # ys_train.append(Y_train.cpu().detach().numpy())
-                # pred_energies_train.append(pred_energy_train.cpu().detach())
-                # true_energies_train.append(Y_energy_train.cpu().detach())
-                preds_test.append(pred_test.cpu().detach().numpy())
-                ys_test.append(Y_test.cpu().detach().numpy())
-                pred_energies_test.append(pred_energy_test.cpu().detach())
-                true_energies_test.append(Y_energy_test.cpu().detach())
-                preds_valid.append(pred_valid.cpu().detach().numpy())
-                ys_valid.append(Y_valid.cpu().detach().numpy())
-                pred_energies_valid.append(pred_energy_valid.cpu().detach())
-                true_energies_valid.append(Y_energy_valid.cpu().detach())
-
             pbar.set_description(f"Test loss {loss_test:.2E}")
 
             self.evaluate_early_stopping(loss_test)
@@ -293,48 +267,38 @@ class ModelTrainer:
             if self.early_stopping:
                 losses = np.array([losses_train, losses_test, losses_valid]).T
                 if self.save:
+                    pred_train = pd.DataFrame(
+                        {
+                            "pred": [pred_train.cpu().detach().numpy()],
+                            "y": [Y_train.cpu().detach().numpy()],
+                            "energy_pred": [pred_energy_train.cpu().detach().numpy()],
+                            "energy_true": [Y_energy_train.cpu().detach().numpy()],
+                        }
+                    )
+
+                    pred_train.to_pickle(self.folder + "predictions/train.pkl")
+
                     pred_test = pd.DataFrame(
                         {
-                            "pred": np.vstack(preds_test).tolist(),
-                            "y": np.vstack(ys_test).tolist(),
-                            "energy_pred": np.vstack(pred_energies_test).tolist(),
-                            "energy_true": np.vstack(true_energies_test).tolist(),
+                            "pred": [pred_test.cpu().detach().numpy()],
+                            "y": [Y_test.cpu().detach().numpy()],
+                            "energy_pred": [pred_energy_test.cpu().detach().numpy()],
+                            "energy_true": [Y_energy_test.cpu().detach().numpy()],
                         }
                     )
 
                     pred_test.to_pickle(self.folder + "predictions/test.pkl")
 
-                    del pred_test, preds_test, ys_test
-
                     pred_valid = pd.DataFrame(
                         {
-                            "pred": np.vstack(preds_valid).tolist(),
-                            "y": np.vstack(ys_valid).tolist(),
-                            "energy_pred": np.vstack(pred_energies_valid).tolist(),
-                            "energy_true": np.vstack(true_energies_valid).tolist(),
+                            "pred": [pred_valid.cpu().detach().numpy()],
+                            "y": [Y_valid.cpu().detach().numpy()],
+                            "energy_pred": [pred_energy_valid.cpu().detach().numpy()],
+                            "energy_true": [Y_energy_valid.cpu().detach().numpy()],
                         }
                     )
 
                     pred_valid.to_pickle(self.folder + "predictions/valid.pkl")
-
-                    del pred_valid, preds_valid, ys_valid
-
-                    # pred_train = pd.DataFrame()
-
-                    # pred_train_series = pd.Series(np.vstack(preds_train).tolist())
-
-                    # pred_train["pred"] = pred_train_series
-
-                    # del preds_train, pred_train_series
-
-                    # pred_train_series_y = pd.Series(np.vstack(ys_train).tolist())
-
-                    # pred_train["y"] = pred_train_series_y
-
-                    # del ys_train, pred_train_series_y
-
-                    # pred_train.to_pickle(self.folder + "predictions/train.pkl")
-                    # del pred_train
 
                 return pd.DataFrame(
                     losses, columns=["Train_loss", "Test_loss", "Valid_loss"]
@@ -342,44 +306,38 @@ class ModelTrainer:
 
         losses = np.array([losses_train, losses_test, losses_valid]).T
         if self.save:
+            pred_train = pd.DataFrame(
+                {
+                    "pred": [pred_train.cpu().detach().numpy()],
+                    "y": [Y_train.cpu().detach().numpy()],
+                    "energy_pred": [pred_energy_train.cpu().detach().numpy()],
+                    "energy_true": [Y_energy_train.cpu().detach().numpy()],
+                }
+            )
+
+            pred_train.to_pickle(self.folder + "predictions/train.pkl")
+
             pred_test = pd.DataFrame(
                 {
-                    "pred": np.vstack(preds_test).tolist(),
-                    "y": np.vstack(ys_test).tolist(),
+                    "pred": [pred_test.cpu().detach().numpy()],
+                    "y": [Y_test.cpu().detach().numpy()],
+                    "energy_pred": [pred_energy_test.cpu().detach().numpy()],
+                    "energy_true": [Y_energy_test.cpu().detach().numpy()],
                 }
             )
 
             pred_test.to_pickle(self.folder + "predictions/test.pkl")
 
-            del pred_test, preds_test, ys_test
-
             pred_valid = pd.DataFrame(
                 {
-                    "pred": np.vstack(preds_valid).tolist(),
-                    "y": np.vstack(ys_valid).tolist(),
+                    "pred": [pred_valid.cpu().detach().numpy()],
+                    "y": [Y_valid.cpu().detach().numpy()],
+                    "energy_pred": [pred_energy_valid.cpu().detach().numpy()],
+                    "energy_true": [Y_energy_valid.cpu().detach().numpy()],
                 }
             )
 
             pred_valid.to_pickle(self.folder + "predictions/valid.pkl")
-
-            del pred_valid, preds_valid, ys_valid
-
-            # pred_train = pd.DataFrame()
-
-            # pred_train_series = pd.Series(np.vstack(preds_train).tolist())
-
-            # pred_train["pred"] = pred_train_series
-
-            # del preds_train, pred_train_series
-
-            # pred_train_series_y = pd.Series(np.vstack(ys_train).tolist())
-
-            # pred_train["y"] = pred_train_series_y
-
-            # del ys_train, pred_train_series_y
-
-            # pred_train.to_pickle(self.folder + "predictions/train.pkl")
-            # del pred_train
 
         return pd.DataFrame(losses, columns=["Train_loss", "Test_loss", "Valid_loss"])
 
