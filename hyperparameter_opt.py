@@ -23,7 +23,6 @@ def hyperparameter_objective(trial: optuna.Trial, trainer: ModelTrainer) -> floa
     lr = trial.suggest_float("Learning_rate", 1e-9, 1e-5, log=True)
     beta1 = trial.suggest_float("Beta1", 0.8, 0.95)
     beta2 = trial.suggest_float("Beta2", 0.951, 0.99999)
-    epsilon_optimizer = trial.suggest_float("Epsilon optimizer", 1e-10, 1e-6)
     decay_rate = trial.suggest_float("Decay rate", 0.001, 0.01)
 
     scheduler_patience = 5
@@ -37,7 +36,6 @@ def hyperparameter_objective(trial: optuna.Trial, trainer: ModelTrainer) -> floa
         trainer.model.parameters(),
         lr=lr,
         betas=(beta1, beta2),
-        eps=epsilon_optimizer,
         weight_decay=decay_rate,
     )
     trainer.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
