@@ -9,7 +9,7 @@ import torch
 from numpy.typing import NDArray
 from typing import Tuple, List
 
-from utils import load_config, extract_fock, extract_overlap
+from utils import load_config, extract_fock, extract_overlap, freedman_diaconis_bins
 
 sns.set_style("white")
 sns.set_style("ticks")
@@ -29,7 +29,8 @@ swifter.set_defaults(
 class Plotter:
     def __init__(self) -> None:
         self.path = None
-        self.save = False
+        self.save_dir = None
+
         self.goal_line = None
         self.goal_error = None
 
@@ -49,7 +50,7 @@ class Plotter:
             folders = sorted(
                 folders, key=lambda x: os.path.getmtime(os.path.join("Models", x))
             )
-            self.path = "Models/" + folders[-1] + "/"
+            self.path = f"Models/{folders[-1]}/"
         else:
             self.path = f"Models/m{self.path}/"
 
@@ -140,10 +141,11 @@ class Plotter:
         plt.xlim(left=0)
         plt.ylim(bottom=0)
 
-        if self.save:
-            plt.savefig(self.path + "Loss.png", dpi=600)
+        plt.savefig(self.path + "Loss.png", dpi=600)
 
-    def plot_energies(self, energies_true, energies_pred, data_name: str) -> None:
+    def plot_energies(
+        self, energies_true: NDArray, energies_pred: NDArray, data_name: str
+    ) -> None:
         fig, ax = plt.subplots()
         ax.scatter(energies_pred[0], energies_true[0], linewidths=1)
 
@@ -153,9 +155,20 @@ class Plotter:
 
         plt.savefig(self.path + data_name + "_energies.png", dpi=600)
 
-    def main(self, path: str = None, save: bool = True) -> None:
-        self.save = save
+    def plot_distribution(
+        self, energies_true: NDArray, energies_pred: NDArray, data_name: str
+    ) -> None:
+        bins = freedman_diaconis_bins(energies_true[0])
+        fig, ax = plt.subplots()
+        ax.hist(energies_pred[0], label="Predicted eigenenergies", bins=bins)
+        ax.hist(energies_true[0], label="True eigenenergies", bins=bins)
+        ax.set_xlabel("Eigenenergy [Ha]")
+        ax.set_ylabel("Frequency")
+        plt.tight_layout()
 
+        plt.savefig(self.path + f"{data_name}_energy_distribution.png", dpi=600)
+
+    def main(self, path: str = None) -> None:
         self.path = path
 
         (
@@ -168,6 +181,10 @@ class Plotter:
             energy_true,
         ) = self.load_model_data()
 
+        self.save_dir = self.path + "Figures/"
+
+        os.makedirs(self.save_dir, exist_ok=True)
+
         config = load_config(self.path)
 
         self.goal_line = config[f"dftb_dft_delta_{config['loss_metric']}"]
@@ -179,6 +196,10 @@ class Plotter:
         self.plot_energies(energy_preds[1], energy_true[1], "test")
 
         self.plot_energies(energy_preds[2], energy_true[2], "valid")
+
+        self.plot_distribution(energy_preds[1], energy_true[1], "test")
+
+        self.plot_distribution(energy_preds[2], energy_true[2], "valid")
 
 
 if __name__ == "__main__":
