@@ -37,7 +37,7 @@ def train_model_optimization(model_handler, trial) -> float:
 
         model_handler.evaluate_early_stopping(loss_test)
 
-        trial.report(loss_test)
+        trial.report(loss_test, epoch)
 
         if trial.should_prune():
             raise optuna.TrialPruned()
@@ -76,13 +76,11 @@ def hyperparameter_objective(trial: optuna.Trial, trainer: ModelTrainer) -> floa
         patience=scheduler_patience,
     )
 
-    loss = train_model_optimization(trainer, trial)
+    test_loss = train_model_optimization(trainer, trial)
 
     del trainer.model
 
-    trial.report(loss)
-
-    return loss["Test_loss"].iloc[-1]
+    return test_loss
 
 
 def optimize_model():
