@@ -2,11 +2,28 @@ import os
 import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
+import swifter
+import numpy as np
+import torch
 
-from utils import load_config
+from numpy.typing import NDArray
+from typing import Tuple, List
+
+from utils import load_config, extract_fock, extract_overlap
 
 sns.set_style("white")
 sns.set_style("ticks")
+
+
+swifter.set_defaults(
+    npartitions=8,
+    dask_threshold=2,
+    scheduler="processes",
+    progress_bar=False,
+    progress_bar_desc=None,
+    allow_dask_on_strings=False,
+    force_parallel=False,
+)
 
 
 class Plotter:
@@ -16,14 +33,62 @@ class Plotter:
         self.goal_line = None
         self.goal_error = None
 
-    def load_model_data(self) -> pd.DataFrame:
+    def load_model_data(
+        self,
+    ) -> Tuple[
+        pd.DataFrame,
+        List[NDArray],
+        List[NDArray],
+        List[NDArray],
+        List[NDArray],
+        List[NDArray],
+        List[NDArray],
+    ]:
         if self.path == None:
             folders = os.listdir("Models/")
             folders = sorted(
                 folders, key=lambda x: os.path.getmtime(os.path.join("Models", x))
             )
             self.path = "Models/" + folders[-1] + "/"
-        return pd.read_pickle(self.path + "losses.pkl")
+        else:
+            self.path = f"Models/m{self.path}/"
+
+        loss = pd.read_pickle(self.path + "losses.pkl")
+        train_pred = pd.read_pickle(self.path + "predictions/train.pkl")
+        test_pred = pd.read_pickle(self.path + "predictions/test.pkl")
+        valid_pred = pd.read_pickle(self.path + "predictions/valid.pkl")
+        fock_preds = [
+            extract_fock(pred["pred"]) for pred in [train_pred, test_pred, valid_pred]
+        ]
+        overlap_preds = [
+            extract_overlap(pred["pred"])
+            for pred in [train_pred, test_pred, valid_pred]
+        ]
+
+        fock_true = [
+            extract_fock(pred["y"]) for pred in [train_pred, test_pred, valid_pred]
+        ]
+        overlap_true = [
+            extract_overlap(pred["y"]) for pred in [train_pred, test_pred, valid_pred]
+        ]
+
+        energy_preds = [
+            pred["energy_pred"] for pred in [train_pred, test_pred, valid_pred]
+        ]
+
+        energy_true = [
+            pred["energy_true"] for pred in [train_pred, test_pred, valid_pred]
+        ]
+
+        return (
+            loss,
+            fock_preds,
+            overlap_preds,
+            fock_true,
+            overlap_true,
+            energy_preds,
+            energy_true,
+        )
 
     def plot_loss(self, loss: pd.DataFrame) -> None:
         fig, ax = plt.subplots()
@@ -67,7 +132,7 @@ class Plotter:
 
         ax.indicate_inset_zoom(zoomed_ax, edgecolor="grey")
 
-        plt.legend()
+        plt.legend(prop={"size": 15})
         plt.xlabel("Epoch")
         plt.ylabel("Loss [Ha] (MSE)")
         plt.tight_layout()
@@ -76,26 +141,32 @@ class Plotter:
         plt.ylim(bottom=0)
 
         if self.save:
-            plt.savefig(self.path + "Loss.png")
+            plt.savefig(self.path + "Loss.png", dpi=600)
 
-    def plot_valid_vs_test(self, loss: pd.DataFrame) -> None:
+    def plot_energies(self, energies_true, energies_pred, data_name: str) -> None:
         fig, ax = plt.subplots()
-        loss_valid = loss.Valid_loss
-        loss_test = loss.Test_loss
-        ax.scatter(loss_test, loss_valid)
+        ax.scatter(energies_pred[0], energies_true[0], linewidths=1)
 
-        plt.xlabel("Test loss [Ha]")
-        plt.ylabel("Validation loss [Ha]")
+        plt.xlabel("Eigen energy predictions [Ha]")
+        plt.ylabel("True eigen energies [Ha]")
         plt.tight_layout()
 
-        plt.savefig(self.path + "Valid_test.png")
+        plt.savefig(self.path + data_name + "_energies.png", dpi=600)
 
     def main(self, path: str = None, save: bool = True) -> None:
         self.save = save
 
         self.path = path
 
-        losses = self.load_model_data()
+        (
+            loss,
+            fock_preds,
+            overlap_preds,
+            fock_true,
+            overlap_true,
+            energy_preds,
+            energy_true,
+        ) = self.load_model_data()
 
         config = load_config(self.path)
 
@@ -103,9 +174,11 @@ class Plotter:
 
         self.goal_error = config[f"dftb_dft_std_{config['loss_metric']}"]
 
-        self.plot_loss(losses)
+        self.plot_loss(loss)
 
-        self.plot_valid_vs_test(losses)
+        self.plot_energies(energy_preds[1], energy_true[1], "test")
+
+        self.plot_energies(energy_preds[2], energy_true[2], "valid")
 
 
 if __name__ == "__main__":
