@@ -141,32 +141,84 @@ class Plotter:
         plt.xlim(left=0)
         plt.ylim(bottom=0)
 
-        plt.savefig(self.path + "Loss.png", dpi=600)
+        plt.savefig(self.save_dir + "Loss.png", dpi=600)
+        plt.close()
 
     def plot_energies(
-        self, energies_true: NDArray, energies_pred: NDArray, data_name: str
+        self, energies_true: pd.Series, energies_pred: pd.Series, data_name: str
     ) -> None:
         fig, ax = plt.subplots()
-        ax.scatter(energies_pred[0], energies_true[0], linewidths=1)
 
-        plt.xlabel("Eigen energy predictions [Ha]")
-        plt.ylabel("True eigen energies [Ha]")
+        # Stack energies of all molecules
+        energies_true = np.hstack(energies_true[0])
+        energies_pred = np.hstack(energies_pred[0])
+
+        # Remove padding
+        stacked_true = energies_true[energies_true != 0]
+        stacked_pred = energies_pred[energies_pred != 0]
+
+        # Normalize
+        max_energy = max(stacked_true.max(), stacked_pred.max())
+        min_energy = min(stacked_true.min(), stacked_pred.min())
+
+        norm_true = (stacked_true + abs(min_energy)) / (max_energy + abs(min_energy))
+        norm_pred = (stacked_pred + abs(min_energy)) / (max_energy + abs(min_energy))
+
+        ax.scatter(
+            norm_true,
+            norm_pred,
+            linewidths=1,
+            label="Energy correlation",
+        )
+        ax.plot(
+            [0, 1],
+            [0, 1],
+            label="Perfect correlation",
+            color="grey",
+            linestyle="dashed",
+        )
+
+        ax.set_xlim(left=0, right=1)
+        ax.set_ylim(bottom=0, top=1)
+
+        plt.xlabel("Normalized eigen energy predictions [Ha]")
+        plt.ylabel("Normalized true eigen energies [Ha]")
         plt.tight_layout()
-
-        plt.savefig(self.path + data_name + "_energies.png", dpi=600)
+        plt.legend()
+        plt.savefig(self.save_dir + f"energies_{data_name}.png", dpi=600)
+        plt.close()
 
     def plot_distribution(
-        self, energies_true: NDArray, energies_pred: NDArray, data_name: str
+        self, energies_true: pd.Series, energies_pred: pd.Series, data_name: str
     ) -> None:
-        bins = freedman_diaconis_bins(energies_true[0])
-        fig, ax = plt.subplots()
-        ax.hist(energies_pred[0], label="Predicted eigenenergies", bins=bins)
-        ax.hist(energies_true[0], label="True eigenenergies", bins=bins)
-        ax.set_xlabel("Eigenenergy [Ha]")
-        ax.set_ylabel("Frequency")
-        plt.tight_layout()
+        # Stack energies of all molecules
+        energies_true = np.hstack(energies_true[0])
+        energies_pred = np.hstack(energies_pred[0])
 
-        plt.savefig(self.path + f"{data_name}_energy_distribution.png", dpi=600)
+        # Remove padding
+        stacked_true = energies_true[energies_true != 0]
+        stacked_pred = energies_pred[energies_pred != 0]
+
+        bin_size = 0.8  # Set the bin size
+        bin_range = (
+            np.min([stacked_pred, stacked_true]),
+            np.max([stacked_pred, stacked_true]),
+        )  # Set the bin range
+        bins = np.arange(*bin_range, bin_size)  # Create an array of bin edges
+
+        plt.hist(
+            [stacked_pred, stacked_true],
+            label=["Predicted eigenenergies", "True eigenenergies"],
+            bins=bins,
+        )
+        plt.xlabel("Eigenenergy [Ha]")
+        plt.ylabel("Frequency")
+        plt.yscale("log")
+
+        plt.legend()
+        plt.tight_layout()
+        plt.savefig(self.save_dir + f"energy_distribution_{data_name}.png", dpi=600)
+        plt.close()
 
     def main(self, path: str = None) -> None:
         self.path = path
