@@ -96,7 +96,7 @@ def optimize_model():
 
     model_name = model_trainer.model.__class__.__name__
 
-    pruner = optuna.pruners.SuccessiveHalvingPruner()
+    pruner = optuna.pruners.SuccessiveHalvingPruner(bootstrap_count=30)
 
     # storage = optuna.storages.RDBStorage(f'/Optuna/studies/{now}.db')
     storage = f"sqlite:///Optuna/studies/{now}.db"
@@ -109,6 +109,7 @@ def optimize_model():
         lambda trail: hyperparameter_objective(trail, model_trainer),
         n_trials=100,
         gc_after_trial=True,
+        show_progress_bar=True,
     )
 
     # Get the best trial from the study
