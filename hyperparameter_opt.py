@@ -49,7 +49,7 @@ def train_model_optimization(model_handler, trial) -> float:
 
 
 def hyperparameter_objective(trial: optuna.Trial, trainer: ModelTrainer) -> float:
-    trainer.model = GNN().to(trainer.device)
+    trainer.model = GNN_MG_FO().to(trainer.device)
     trainer.loss_metric = "All"
 
     lr = trial.suggest_float("Learning_rate", 1e-9, 1e-5, log=True)
@@ -90,13 +90,13 @@ def optimize_model():
     model_trainer.epochs = 300
     model_trainer.data_intervals = os.listdir("Data/datasets")
     model_trainer.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model_trainer.model = GNN().to(model_trainer.device)
+    model_trainer.model = GNN_MG_FO().to(model_trainer.device)
     model_trainer.batch_size = int(2048 / 32)
     model_trainer.setup_data()
 
     model_name = model_trainer.model.__class__.__name__
 
-    pruner = optuna.pruners.SuccessiveHalvingPruner(bootstrap_count=30)
+    pruner = optuna.pruners.SuccessiveHalvingPruner()
 
     # storage = optuna.storages.RDBStorage(f'/Optuna/studies/{now}.db')
     storage = f"sqlite:///Optuna/studies/{now}.db"
