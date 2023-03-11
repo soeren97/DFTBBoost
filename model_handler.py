@@ -16,7 +16,7 @@ from torchmetrics import MeanSquaredError as MSE
 from torchmetrics import MeanAbsoluteError as MAE
 from torchmetrics import MeanSquaredLogError as MSLE
 
-from models import GNN, CNN, NN, GNN_plus, GNN_minus
+from models import GNN_MG, NN, GNN_MG_FO, GNN
 from CostumDataset import CostumDataset
 
 from typing import List, Tuple
@@ -56,7 +56,7 @@ class ModelTrainer:
     def setup_data(self) -> None:
         model_name = self.model.__class__.__name__
 
-        if model_name in ["GNN", "GNN_plus", "GNN_minus"]:
+        if model_name in ["GNN", "GNN_MG", "GNN_MG_FO"]:
             self.loader = GNNDataloader
             self.collate_fn = utils.costume_collate_GNN
         else:
@@ -152,7 +152,7 @@ class ModelTrainer:
 
         n_orbitals.to(self.device)
 
-        if self.model.__class__.__name__ in ["GNN", "GNN_plus", "GNN_minus"]:
+        if self.model.__class__.__name__ in ["GNN", "GNN_MG", "GNN_MG_FO"]:
             preds = self.model(X)
 
         else:

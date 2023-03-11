@@ -361,9 +361,10 @@ class DataTransformer:
 
         save_location = "Data/datasets/"
 
-        GNNminus_data = []
         GNN_data = []
-        GNNplus_data = []
+        GNN_MG_data = []
+        GNN_MG_FO_data = []
+
         X_list = []
         Y_list = []
         smiles = []
@@ -387,24 +388,50 @@ class DataTransformer:
 
             coord = xyz[:, 1:].astype("float64")
 
-            graph = read_smiles(smile, explicit_hydrogen=True)
+            graph_MO = read_smiles(smile, explicit_hydrogen=True)
 
-            graph_plus = graph.copy()
+            graph_MO_FO = graph_MO.copy()
 
-            graph_minus = graph.copy()
+            graph = graph_MO.copy()
 
             feature = self.element_to_onehot(
-                np.asarray(graph.nodes(data="element"))[:, 1]
+                np.asarray(graph_MO.nodes(data="element"))[:, 1]
             )
 
             # This function includes what type of bond connects two nodes and is used as edge_attr
             bond_attributes = from_smiles(smile, with_hydrogen=True).edge_attr
 
+            # GNN_MO
+            nx.set_node_attributes(
+                graph_MO,
+                {
+                    k: {"x": [feature[k], coord[k][0], coord[k][1], coord[k][2]]}
+                    for k, d in dict(graph_MO.nodes(data=True)).items()
+                },
+            )
+
+            graph_MO = from_networkx(graph_MO)
+
+            del graph_MO["element"], graph_MO["aromatic"], graph_MO["charge"]
+
+            # [:,0] describes what type of bond the edge is, ie a single, double or triple bond
+            edge_attributes = bond_attributes[:, 0].clone()
+
+            data_graph_MO = GraphData(
+                x=graph_MO.x,
+                edge_index=graph_MO.edge_index,
+                edge_attr=edge_attributes,
+            )
+
+            num_nodes = graph_MO.num_nodes
+
+            data_graph_MO.num_nodes = num_nodes
+
             # GNN
             nx.set_node_attributes(
                 graph,
                 {
-                    k: {"x": [feature[k], coord[k][0], coord[k][1], coord[k][2]]}
+                    k: {"x": [feature[k]]}
                     for k, d in dict(graph.nodes(data=True)).items()
                 },
             )
@@ -412,9 +439,6 @@ class DataTransformer:
             graph = from_networkx(graph)
 
             del graph["element"], graph["aromatic"], graph["charge"]
-
-            # [:,0] describes what type of bond the edge is, ie a single, double or triple bond
-            edge_attributes = bond_attributes[:, 0].clone()
 
             data_graph = GraphData(
                 x=graph.x,
@@ -426,32 +450,9 @@ class DataTransformer:
 
             data_graph.num_nodes = num_nodes
 
-            # GNN_minus
-            nx.set_node_attributes(
-                graph_minus,
-                {
-                    k: {"x": [feature[k]]}
-                    for k, d in dict(graph_minus.nodes(data=True)).items()
-                },
-            )
-
-            graph_minus = from_networkx(graph_minus)
-
-            del graph_minus["element"], graph_minus["aromatic"], graph_minus["charge"]
-
-            data_graph_minus = GraphData(
-                x=graph_minus.x,
-                edge_index=graph_minus.edge_index,
-                edge_attr=edge_attributes,
-            )
-
-            num_nodes = graph_minus.num_nodes
-
-            data_graph_minus.num_nodes = num_nodes
-
-            # GNN_plus
+            # GNN_MG_FO
             nodes_ham, edge_attributes, n_electrons = self.extract_data_from_matrices(
-                graph, hamdftb_pad, overdftb_pad, edge_attributes
+                graph_MO, hamdftb_pad, overdftb_pad, edge_attributes
             )
 
             try:
@@ -465,7 +466,7 @@ class DataTransformer:
             Y.append(torch.concat((hamiltonian_g16, overlap_g16)))
 
             nx.set_node_attributes(
-                graph_plus,
+                graph_MO_FO,
                 {
                     k: {
                         "x": [
@@ -480,31 +481,31 @@ class DataTransformer:
                         ]
                     }
                     for i, (k, d) in enumerate(
-                        dict(graph_plus.nodes(data=True)).items()
+                        dict(graph_MO_FO.nodes(data=True)).items()
                     )
                 },
             )
 
-            graph_plus = from_networkx(graph_plus)
+            graph_MO_FO = from_networkx(graph_MO_FO)
 
-            del graph["element"], graph["aromatic"], graph["charge"]
+            del graph_MO["element"], graph_MO["aromatic"], graph_MO["charge"]
 
-            data_graph_plus = GraphData(
-                x=graph_plus.x,
-                edge_index=graph_plus.edge_index,
+            data_graph_MO_FO = GraphData(
+                x=graph_MO_FO.x,
+                edge_index=graph_MO_FO.edge_index,
                 edge_attr=edge_attributes,
                 y=Y,
             )
 
-            data_graph_plus.num_nodes = num_nodes
+            data_graph_MO_FO.num_nodes = num_nodes
 
             smiles.append(smile)
 
-            GNNminus_data.append(data_graph_minus)
-
             GNN_data.append(data_graph)
 
-            GNNplus_data.append(data_graph_plus)
+            GNN_MG_data.append(data_graph_MO)
+
+            GNN_MG_FO_data.append(data_graph_MO_FO)
 
             X_list.append(NN_X)
 
@@ -533,38 +534,38 @@ class DataTransformer:
 
                 NN_data.to_pickle(save_location + "NN/" + file_name)
 
-                GNN_minus = {
-                    "SMILES": smiles,
-                    "X": GNNminus_data,
-                    "Y": Y_list,
-                    "N_electrons": electron_list,
-                }
-                GNNminus_data = pd.DataFrame(GNN_minus)
-                GNNminus_data.to_pickle(save_location + "GNN_minus/" + file_name)
-
                 GNN = {
                     "SMILES": smiles,
                     "X": GNN_data,
                     "Y": Y_list,
                     "N_electrons": electron_list,
                 }
-
                 GNN_data = pd.DataFrame(GNN)
-
                 GNN_data.to_pickle(save_location + "GNN/" + file_name)
 
-                GNN_plus = {
+                GNN_MG = {
                     "SMILES": smiles,
-                    "X": GNNplus_data,
+                    "X": GNN_MG_data,
                     "Y": Y_list,
                     "N_electrons": electron_list,
                 }
-                GNNplus_data = pd.DataFrame(GNN_plus)
-                GNNplus_data.to_pickle(save_location + "GNN_plus/" + file_name)
 
-                GNNminus_data = []
+                GNN_MG_data = pd.DataFrame(GNN_MG)
+
+                GNN_MG_data.to_pickle(save_location + "GNN_MG/" + file_name)
+
+                GNN_MG_FO = {
+                    "SMILES": smiles,
+                    "X": GNN_MG_FO_data,
+                    "Y": Y_list,
+                    "N_electrons": electron_list,
+                }
+                GNN_MG_FO_data = pd.DataFrame(GNN_MG_FO)
+                GNN_MG_FO_data.to_pickle(save_location + "GNN_MG_FO/" + file_name)
+
                 GNN_data = []
-                GNNplus_data = []
+                GNN_MG_data = []
+                GNN_MG_FO_data = []
                 X_list = []
                 Y_list = []
                 smiles = []

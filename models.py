@@ -6,9 +6,9 @@ from torch_geometric.nn import global_mean_pool as gap, global_max_pool as gmp
 from torch_geometric.nn import GATConv, BatchNorm, GraphNorm
 
 
-class GNN_minus(Module):
+class GNN(Module):
     def __init__(self):
-        super(GNN_minus, self).__init__()
+        super(GNN, self).__init__()
         self.embedding_size = 64
 
         self.initial_conv = GATConv(1, self.embedding_size)
@@ -50,9 +50,13 @@ class GNN_minus(Module):
         return out
 
 
-class GNN(Module):
+class GNN_MG(Module):
+    """
+    Graph Neural Network containing Molecular Geometry
+    """
+
     def __init__(self):
-        super(GNN, self).__init__()
+        super(GNN_MG, self).__init__()
         self.embedding_size = 16
 
         self.initial_conv = GATConv(4, self.embedding_size)
@@ -86,9 +90,13 @@ class GNN(Module):
         return out
 
 
-class GNN_plus(Module):
+class GNN_MG_FO(Module):
+    """
+    Graph Neural Network containing Molecular Geometry, Fock matrix and Overlap matrix.
+    """
+
     def __init__(self):
-        super(GNN_plus, self).__init__()
+        super(GNN_MG_FO, self).__init__()
         self.embedding_size = 64
 
         self.initial_conv = GATConv(8, self.embedding_size)
@@ -175,7 +183,7 @@ class NN(Module):
         return out
 
 
-models = [NN(), GNN(), GNN_plus()]
+models = [NN(), GNN(), GNN_MG(), GNN_MG_FO()]
 
 if __name__ == "__main__":
     for model in models:
