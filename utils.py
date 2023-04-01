@@ -23,7 +23,7 @@ def load_config(path: Optional[str] = None) -> Dict:
     if path == None:
         path = "model_config/config.yaml"
     else:
-        path = path + "config.yaml"
+        path = f"model_config/{path}.yaml"
 
     with open(path, "r") as file:
         config = yaml.safe_load(file)
@@ -192,3 +192,55 @@ def extract_fock(matrix: NDArray) -> NDArray:
 def extract_overlap(matrix: NDArray) -> NDArray:
     overlap_matrix = matrix[2145:]
     return np.array(overlap_matrix)
+
+
+def calculate_transmission(
+    fock_matrix: NDArray, overlap_matrix: NDArray, energy_range: NDArray
+) -> float:
+    # Calculate Hamiltonian matrix
+    hamiltonian_matrix = fock_matrix + overlap_matrix
+
+    # Calculate Green's function
+    greens_function = np.linalg.inv(
+        energy_range * np.identity(len(hamiltonian_matrix)) - hamiltonian_matrix
+    )
+
+    # Calculate transmission coefficient
+    left_matrix = np.matmul(
+        np.matmul(
+            np.conj(
+                np.transpose(
+                    greens_function[: len(overlap_matrix), : len(overlap_matrix)]
+                )
+            ),
+            overlap_matrix,
+        ),
+        greens_function[: len(overlap_matrix), : len(overlap_matrix)],
+    )
+    right_matrix = np.matmul(
+        np.matmul(
+            np.conj(
+                np.transpose(
+                    greens_function[-len(overlap_matrix) :, -len(overlap_matrix) :]
+                )
+            ),
+            overlap_matrix,
+        ),
+        greens_function[-len(overlap_matrix) :, -len(overlap_matrix) :],
+    )
+    transmission = np.trace(np.matmul(left_matrix, np.conj(np.transpose(right_matrix))))
+
+    return transmission.real
+
+
+def freedman_diaconis_bins(data):
+    # Calculate the interquartile range (IQR) of the data
+    iqr = np.subtract(*np.percentile(data, [75, 25]))
+
+    # Calculate the bin width using the Freedman-Diaconis rule
+    bin_width = 2 * iqr * (len(data) ** (-1 / 3))
+
+    # Calculate the number of bins
+    n_bins = (np.max(data) - np.min(data)) / bin_width
+
+    return int(n_bins)
