@@ -351,12 +351,13 @@ class ModelTrainer:
         shutil.copy("model_config/config.yaml", model_folder + "config.yaml")
 
         config = utils.load_config()
+        embeding_size = config["embeding_size"]
         self.epochs = config["epochs"]
         self.batch_size = int(config["batch_size"] / 32)
         self.decay_rate = float(config["decay_rate"])
         self.lr = float(config["lr"])
         self.reset_patience = config["start_patience"]
-        self.model = eval(config["model"])().to(self.device)
+        self.model = eval(config["model"])(embeding_size).to(self.device)
         self.loss_metric = config["loss_metric"]
 
         self.save = True
