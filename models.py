@@ -7,9 +7,9 @@ from torch_geometric.nn import GATConv, BatchNorm, GraphNorm
 
 
 class GNN(Module):
-    def __init__(self):
+    def __init__(self, embedding_size):
         super(GNN, self).__init__()
-        self.embedding_size = 64
+        self.embedding_size = embedding_size
 
         self.initial_conv = GATConv(1, self.embedding_size)
         self.conv1 = GATConv(self.embedding_size, self.embedding_size)
@@ -35,12 +35,12 @@ class GNN(Module):
         hidden = torch.tanh(hidden)
         hidden = F.dropout(hidden, p=0.2)
 
-        hidden = self.batchnorm(hidden)
-        hidden = self.graphnorm(hidden)
+        # hidden = self.batchnorm(hidden)
+        # hidden = self.graphnorm(hidden)
 
-        hidden = self.conv1(hidden, edge_index, edge_attr)
-        hidden = torch.tanh(hidden)
-        hidden = F.dropout(hidden, p=0.2)
+        # hidden = self.conv1(hidden, edge_index, edge_attr)
+        # hidden = torch.tanh(hidden)
+        # hidden = F.dropout(hidden, p=0.2)
 
         # Global Pooling (stack different aggregations)
         hidden = torch.cat([gmp(hidden, batch_index), gap(hidden, batch_index)], dim=1)
@@ -55,9 +55,9 @@ class GNN_MG(Module):
     Graph Neural Network containing Molecular Geometry
     """
 
-    def __init__(self):
+    def __init__(self, embedding_size):
         super(GNN_MG, self).__init__()
-        self.embedding_size = 16
+        self.embedding_size = embedding_size
 
         self.initial_conv = GATConv(4, self.embedding_size)
         self.conv1 = GATConv(self.embedding_size, self.embedding_size)
@@ -95,9 +95,9 @@ class GNN_MG_FO(Module):
     Graph Neural Network containing Molecular Geometry, Fock matrix and Overlap matrix.
     """
 
-    def __init__(self):
+    def __init__(self, embedding_size):
         super(GNN_MG_FO, self).__init__()
-        self.embedding_size = 64
+        self.embedding_size = embedding_size
 
         self.initial_conv = GATConv(8, self.embedding_size)
         self.conv1 = GATConv(self.embedding_size, self.embedding_size)
@@ -156,9 +156,9 @@ class CNN(Module):
 
 
 class NN(Module):
-    def __init__(self):
+    def __init__(self, embedding_size):
         super(NN, self).__init__()
-        self.embedding_size = 64
+        self.embedding_size = embedding_size
 
         self.initial = Linear(2145 * 2, self.embedding_size)
         self.lin1 = Linear(self.embedding_size, self.embedding_size * 2)
@@ -183,7 +183,7 @@ class NN(Module):
         return out
 
 
-models = [NN(), GNN(), GNN_MG(), GNN_MG_FO()]
+models = [NN(16), GNN(16), GNN_MG(16), GNN_MG_FO(16)]
 
 if __name__ == "__main__":
     for model in models:
