@@ -49,13 +49,15 @@ def train_model_optimization(model_handler, trial) -> float:
 
 
 def hyperparameter_objective(trial: optuna.Trial, trainer: ModelTrainer) -> float:
-    trainer.model = GNN_MG_FO().to(trainer.device)
+    embeding_size = trial.suggest_int("embedding_size", 8, 128)
+
+    trainer.model = GNN_MG(embeding_size).to(trainer.device)
     trainer.loss_metric = "All"
 
-    lr = trial.suggest_float("Learning_rate", 1e-9, 1e-5, log=True)
-    beta1 = trial.suggest_float("Beta1", 0.8, 0.95)
-    beta2 = trial.suggest_float("Beta2", 0.951, 0.99999)
-    decay_rate = trial.suggest_float("Decay rate", 0.001, 0.01)
+    lr = trial.suggest_float("lr", 1e-9, 1e-5, log=True)
+    beta1 = trial.suggest_float("beta1", 0.8, 0.95)
+    beta2 = trial.suggest_float("beta2", 0.951, 0.99999)
+    decay_rate = trial.suggest_float("decay_rate", 0.001, 0.01)
 
     scheduler_patience = 5
 
@@ -90,7 +92,7 @@ def optimize_model():
     model_trainer.epochs = 300
     model_trainer.data_intervals = os.listdir("Data/datasets")
     model_trainer.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model_trainer.model = GNN_MG_FO().to(model_trainer.device)
+    model_trainer.model = GNN_MG(2).to(model_trainer.device)
     model_trainer.batch_size = int(2048 / 32)
     model_trainer.setup_data()
 
