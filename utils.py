@@ -7,6 +7,7 @@ import math
 from torch import default_generator, randperm
 from torch._utils import _accumulate
 import yaml
+from scipy.stats import binom
 
 from torch.utils.data.dataset import Subset, Dataset
 from torch_geometric.data import Batch
@@ -15,15 +16,18 @@ from typing import Sequence, Union, Generator, List, Dict, Tuple, Optional
 from numpy.typing import NDArray
 
 
-def load_config(path: Optional[str] = None) -> Dict:
+def load_config(
+    path: Optional[str] = None, model_name: Optional[str] = "config"
+) -> Dict:
     """Function to load in configuration file for model.
+
     Used to easily change variables such as learning rate,
     loss function and such
     """
     if path == None:
-        path = "model_config/config.yaml"
+        path = f"model_config/{model_name}.yaml"
     else:
-        path = f"model_config/{path}.yaml"
+        path = f"{path}config.yaml"
 
     with open(path, "r") as file:
         config = yaml.safe_load(file)
@@ -132,6 +136,12 @@ def find_eigenvalues(
 
     # Compute eigenvalues
     eigenvalues = eigvalsh(overlaps.inverse() @ hamiltonians)
+
+    mask = torch.arange(65).unsqueeze(0).repeat(
+        n_orbitals.shape[0], 1
+    ) > n_orbitals.unsqueeze(1)
+
+    eigenvalues = eigenvalues * mask
 
     # find index of HOMO
     i = n_electrons // 2  # fix?
@@ -244,3 +254,44 @@ def freedman_diaconis_bins(data):
     n_bins = (np.max(data) - np.min(data)) / bin_width
 
     return int(n_bins)
+
+
+def mixture_func(
+    x: np.ndarray,
+    w1: float,
+    w2: float,
+    mu1: float,
+    mu2: float,
+    sigma1: float,
+    sigma2: float,
+    p: float,
+    binom_n: float,
+    binom_p: float,
+) -> np.ndarray:
+    """
+    Mixture function of a Poisson distribution and four Gaussian distributions.
+
+    Parameters:
+    x (np.ndarray): The x-values to evaluate the function at.
+    w1 (float): The weight of the first Gaussian distribution.
+    w2 (float): The weight of the second Gaussian distribution.
+    mu1 (float): The mean of the first Gaussian distribution.
+    mu2 (float): The mean of the second Gaussian distribution.
+    sigma1 (float): The standard deviation of the first Gaussian distribution.
+    sigma2 (float): The standard deviation of the second Gaussian distribution.
+    p (float): The weight of the Poisson distribution and normalisation factor.
+    binom_n (float): Binominal number of trials.
+    binom_p (float): Binominal chance of succes.
+
+    Returns:
+    np.ndarray: The evaluated values of the mixture function.
+    """
+    gaussians = np.array(
+        [
+            w1 * np.exp(-0.5 * ((x - mu1) / sigma1) ** 2),
+            w2 * np.exp(-0.5 * ((x - mu2) / sigma2) ** 2),
+        ]
+    )
+    binom_part = p * binom.pmf(x, binom_n, binom_p)
+
+    return np.sum(gaussians, axis=0) + binom_part
