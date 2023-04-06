@@ -237,7 +237,7 @@ class Plotter:
 
         os.makedirs(self.save_dir, exist_ok=True)
 
-        config = load_config(self.path)
+        config = load_config(path=self.path)
 
         self.goal_line = config[f"dftb_dft_delta_{config['loss_metric']}"]
 
