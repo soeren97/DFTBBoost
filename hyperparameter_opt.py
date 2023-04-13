@@ -49,9 +49,9 @@ def train_model_optimization(model_handler, trial) -> float:
 
 
 def hyperparameter_objective(trial: optuna.Trial, trainer: ModelTrainer) -> float:
-    embeding_size = trial.suggest_int("embedding_size", 8, 128)
+    embeding_size = trial.suggest_int("embedding_size", 64, 128)
 
-    trainer.model = GNN_MG(embeding_size).to(trainer.device)
+    trainer.model = GNN(embeding_size).to(trainer.device)
     trainer.loss_metric = "All"
 
     lr = trial.suggest_float("lr", 1e-9, 1e-5, log=True)
@@ -86,13 +86,13 @@ def hyperparameter_objective(trial: optuna.Trial, trainer: ModelTrainer) -> floa
 
 
 def optimize_model():
-    now = datetime.now().strftime("%y_%m_%d_%H_%M_%S")
+    now = datetime.now().strftime("%y_%m_%d_%H_%M")
 
     model_trainer = ModelTrainer()
     model_trainer.epochs = 300
     model_trainer.data_intervals = os.listdir("Data/datasets")
     model_trainer.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model_trainer.model = GNN_MG(2).to(model_trainer.device)
+    model_trainer.model = GNN(2).to(model_trainer.device)
     model_trainer.batch_size = int(2048 / 32)
     model_trainer.setup_data()
 
@@ -100,8 +100,11 @@ def optimize_model():
 
     pruner = optuna.pruners.SuccessiveHalvingPruner()
 
-    # storage = optuna.storages.RDBStorage(f'/Optuna/studies/{now}.db')
-    storage = f"sqlite:///Optuna/studies/{now}.db"
+    folder = f"Optuna/{now}/"
+
+    os.makedirs(folder)
+
+    storage = f"sqlite:///{folder}study.db"
 
     study = optuna.create_study(
         direction="minimize", pruner=pruner, study_name=model_name, storage=storage
@@ -121,7 +124,7 @@ def optimize_model():
     trial_dict = best_trial.params
 
     # Save the dictionary to a YAML file
-    with open(f"Optuna/{model_name + now}.yaml", "w+") as outfile:
+    with open(f"{folder}{model_name}.yaml", "w+") as outfile:
         yaml.dump(trial_dict, outfile, default_flow_style=False)
 
     pruned_trials = study.get_trials(
