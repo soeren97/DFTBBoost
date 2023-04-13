@@ -16,9 +16,9 @@ from torch_geometric.data import Batch
 from pysmiles import read_smiles
 import networkx as nx
 
-import utils
+from utils import find_eigenvalues_true, create_savefolder
 
-from typing import Tuple, List, Union
+from typing import Tuple, List, Union, Optional
 from numpy.typing import NDArray
 
 logging.getLogger("pysmiles").setLevel(logging.CRITICAL)  # Anything higher than warning
@@ -129,6 +129,26 @@ class DataTransformer:
         self.dftb_data.dropna(inplace=True)
         gc.collect()
 
+    def matrix_from_log(self, root: str, nbas: int, identifier: str):
+        try:
+            matrix = []
+            with open(root + identifier) as f:
+                matrix_line = []
+                for idx, line in enumerate(f.readlines()):
+                    row_arr = line.split()
+                    matrix_line.append(row_arr)
+
+                    test_length = np.concatenate(matrix_line)
+                    if test_length.shape[0] == nbas:
+                        temp = [float(x.replace("D", "e")) for x in test_length]
+                        matrix.append(temp)
+                        matrix_line = []
+            matrix = np.array(matrix)
+
+        except:
+            matrix = None
+        return matrix
+
     def extract_data_g16(self) -> None:
         generator = os.walk(self.data_location_g16)
 
@@ -166,41 +186,10 @@ class DataTransformer:
                     for line in f.readlines():
                         if "basis functions," in line:
                             nbas = int(line.split()[0])
-                try:
-                    hamiltonian = []
-                    with open(root + "/hamiltonian.1") as f:
-                        matrix_line = []
-                        for idx, line in enumerate(f.readlines()):
-                            row_arr = line.split()
-                            matrix_line.append(row_arr)
 
-                            test_length = np.concatenate(matrix_line)
-                            if test_length.shape[0] == nbas:
-                                temp = [float(x.replace("D", "e")) for x in test_length]
-                                hamiltonian.append(temp)
-                                matrix_line = []
-                    hamiltonian = np.array(hamiltonian)
+                hamiltonian = self.matrix_from_log(root, nbas, "/hamiltonian.1")
 
-                except:
-                    hamiltonian = None
-
-                try:
-                    overlap = []
-                    with open(root + "/overlap") as f:
-                        matrix_line = []
-                        for idx, line in enumerate(f.readlines()):
-                            row_arr = line.split()
-                            matrix_line.append(row_arr)
-
-                            test_length = np.concatenate(matrix_line)
-                            if test_length.shape[0] == nbas:
-                                temp = [float(x.replace("D", "e")) for x in test_length]
-                                overlap.append(temp)
-                                matrix_line = []
-                    overlap = np.array(overlap)
-
-                except:
-                    overlap = None
+                overlap = self.matrix_from_log(root, nbas, "/overlap")
 
                 if len(hamiltonian) == 0:
                     hamiltonian = None
@@ -233,7 +222,7 @@ class DataTransformer:
         gc.collect()
 
     def pad_and_tril(
-        self, array: NDArray
+        self, array: NDArray, overlap: Optional[bool] = False
     ) -> Union[Tuple[torch.Tensor, torch.Tensor], Tuple[None, None]]:
         tensor = torch.from_numpy(array)
 
@@ -244,17 +233,17 @@ class DataTransformer:
         except:
             return None, None
 
-        tensor = tensor_padded[np.tril_indices(self.max_dim)]
+        if overlap:
+            tensor_padded.fill_diagonal_(1)
 
-        return tensor, tensor_padded
+        trilled = tensor_padded[np.tril_indices(self.max_dim)]
 
-    def element_to_onehot(self, element: List[str]):
-        out = []
-        for i in range(0, len(element)):
-            v = np.zeros(len(self.elements))
-            v[self.elements.index(element[i])] = 1.0
-            out.append(v.argmax())
-        return np.asarray(out)
+        return tensor_padded, trilled
+
+    def element_to_onehot(self, element: List[str]) -> NDArray:
+        indices = np.array([self.elements.index(e) for e in element])
+        onehot = np.eye(len(self.elements))[indices]
+        return np.argmax(onehot, axis=1)
 
     def pad_edge(self, edge: NDArray) -> NDArray:
         padding = 3 - len(edge)
@@ -361,6 +350,14 @@ class DataTransformer:
 
         save_location = "Data/datasets/"
 
+        create_savefolder(os.path.join(save_location, "NN"))
+
+        create_savefolder(os.path.join(save_location, "GNN"))
+
+        create_savefolder(os.path.join(save_location, "GNN_MG"))
+
+        create_savefolder(os.path.join(save_location, "GNN_MG_FO"))
+
         GNN_data = []
         GNN_MG_data = []
         GNN_MG_FO_data = []
@@ -376,15 +373,21 @@ class DataTransformer:
 
             smile, xyz = data["SMILES"], data["Coordinates"]
 
-            hamiltonian_dftb, hamdftb_pad = self.pad_and_tril(data["Hamiltonian"])
-            overlap_dftb, overdftb_pad = self.pad_and_tril(data["Overlap"])
-            hamiltonian_g16, hamg16_pad = self.pad_and_tril(data["Hamiltonian_g16"])
-            overlap_g16, overg16_pad = self.pad_and_tril(data["Overlap_g16"])
+            hamdftb_pad, hamdftb_pad_tril = self.pad_and_tril(data["Hamiltonian"])
+            overdftb_pad, overdftb_pad_tril = self.pad_and_tril(
+                data["Overlap"], overlap=True
+            )
+            hamg16_pad, hamg16_pad_tril = self.pad_and_tril(data["Hamiltonian_g16"])
+            overg16_pad, overg16_pad_tril = self.pad_and_tril(
+                data["Overlap_g16"], overlap=True
+            )
 
-            if None in [hamiltonian_dftb, overlap_dftb, hamiltonian_g16, overlap_g16]:
+            if None in [hamdftb_pad, overdftb_pad, hamg16_pad, overg16_pad]:
                 continue
 
-            NN_X = torch.concat((hamiltonian_dftb, overlap_dftb))
+            n_orbitals = len(data["Hamiltonian"])
+
+            NN_X = torch.concat((hamdftb_pad_tril, overdftb_pad_tril))
 
             coord = xyz[:, 1:].astype("float64")
 
@@ -456,14 +459,12 @@ class DataTransformer:
             )
 
             try:
-                Y = utils.find_eigenvalues_true(
-                    data["Hamiltonian_g16"], data["Overlap_g16"], n_electrons
-                )
+                Y = find_eigenvalues_true(hamg16_pad_tril, overg16_pad_tril, n_orbitals)
             except:
                 print(f"Molecule {smile} failed")
                 continue
 
-            Y.append(torch.concat((hamiltonian_g16, overlap_g16)))
+            Y.append(torch.concat((hamg16_pad_tril, overg16_pad_tril)))
 
             nx.set_node_attributes(
                 graph_MO_FO,
@@ -579,9 +580,6 @@ class DataTransformer:
 
             self.dftb_data.to_pickle("Data/dftb.pkl")
 
-    def load_g16(self) -> None:
-        self.extract_data_g16()
-
     def create_dataset(self) -> None:
         self.data_location = os.getcwd() + "/Data/"
         self.data_location_dftb = self.data_location + "slurm_ready/"
@@ -592,7 +590,7 @@ class DataTransformer:
 
         self.load_dftb()
 
-        self.load_g16()
+        self.extract_data_g16()
 
         self.dftb_data.reset_index(drop=True, inplace=True)
 
@@ -607,7 +605,7 @@ class DataTransformer:
 
 def main() -> None:
     datatransformer = DataTransformer()
-    data_intervals = ["0-10000"]
+    data_intervals = ["1-10000"]
     for i in range(10001, 100001, 10000):
         data_intervals.append(f"{i}-{i + 10000 - 1}")
 

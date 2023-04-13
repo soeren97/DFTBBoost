@@ -20,6 +20,7 @@ from models import GNN_MG, NN, GNN_MG_FO, GNN
 from CostumDataset import CostumDataset
 
 from typing import List, Tuple
+from numpy.typing import NDArray
 
 
 class ModelTrainer:
@@ -107,24 +108,20 @@ class ModelTrainer:
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
 
         # Calculate eigenvalues
-        eigenvalues, HOMO, LUMO = utils.find_eigenvalues(preds, n_electrons, n_orbitals)
+        eigenvalues = utils.find_eigenvalues(preds, n_electrons, n_orbitals)
 
-        if self.loss_metric == "HOMO_LUMO":
-            predicted = torch.stack([HOMO, LUMO])
-            truth = torch.stack(true[:2])
-
-        elif self.loss_metric == "All":
+        if self.loss_metric == "All":
             predicted = eigenvalues
-            truth = true[2]
+            truth = true[0]
 
         else:
             # TODO: Does not work, take from find_eigenvalues as it already zero out unwanted orbitals
             predicted = utils.zero_prediction_padding(preds, n_orbitals)
-            truth = true[3]
+            truth = true[1]
 
         loss = self.loss_fn(predicted, truth)
 
-        return loss, eigenvalues, true[2]
+        return loss, predicted, truth
 
     def closure(
         self, batch
@@ -138,15 +135,13 @@ class ModelTrainer:
     ]:
         (
             X,
-            Y_HOMO,
-            Y_LUMO,
             Y_eigenvalues,
             Y_matrices,
             n_electrons,
             n_orbitals,
         ) = self.collate_fn(batch)
 
-        Y = [Y_HOMO, Y_LUMO, Y_eigenvalues, Y_matrices]
+        Y = [Y_eigenvalues, Y_matrices]
 
         n_electrons.to(self.device)
 
@@ -265,45 +260,53 @@ class ModelTrainer:
             self.evaluate_early_stopping(loss_test)
 
             if self.early_stopping:
-                losses = np.array([losses_train, losses_test, losses_valid]).T
-                if self.save:
-                    pred_train = pd.DataFrame(
-                        {
-                            "pred": [pred_train.cpu().detach().numpy()],
-                            "y": [Y_train.cpu().detach().numpy()],
-                            "energy_pred": [pred_energy_train.cpu().detach().numpy()],
-                            "energy_true": [Y_energy_train.cpu().detach().numpy()],
-                        }
-                    )
-
-                    pred_train.to_pickle(self.folder + "predictions/train.pkl")
-
-                    pred_test = pd.DataFrame(
-                        {
-                            "pred": [pred_test.cpu().detach().numpy()],
-                            "y": [Y_test.cpu().detach().numpy()],
-                            "energy_pred": [pred_energy_test.cpu().detach().numpy()],
-                            "energy_true": [Y_energy_test.cpu().detach().numpy()],
-                        }
-                    )
-
-                    pred_test.to_pickle(self.folder + "predictions/test.pkl")
-
-                    pred_valid = pd.DataFrame(
-                        {
-                            "pred": [pred_valid.cpu().detach().numpy()],
-                            "y": [Y_valid.cpu().detach().numpy()],
-                            "energy_pred": [pred_energy_valid.cpu().detach().numpy()],
-                            "energy_true": [Y_energy_valid.cpu().detach().numpy()],
-                        }
-                    )
-
-                    pred_valid.to_pickle(self.folder + "predictions/valid.pkl")
-
-                return pd.DataFrame(
-                    losses, columns=["Train_loss", "Test_loss", "Valid_loss"]
+                losses = self.save_prediction(
+                    losses_train,
+                    losses_test,
+                    losses_valid,
+                    Y_train,
+                    pred_energy_train,
+                    Y_energy_train,
+                    Y_test,
+                    pred_energy_test,
+                    Y_energy_test,
+                    Y_valid,
+                    pred_energy_valid,
+                    Y_energy_valid,
                 )
 
+        losses = self.save_prediction(
+            losses_train,
+            losses_test,
+            losses_valid,
+            Y_train,
+            pred_energy_train,
+            Y_energy_train,
+            Y_test,
+            pred_energy_test,
+            Y_energy_test,
+            Y_valid,
+            pred_energy_valid,
+            Y_energy_valid,
+        )
+
+        return pd.DataFrame(losses, columns=["Train_loss", "Test_loss", "Valid_loss"])
+
+    def save_prediction(
+        self,
+        losses_train: List,
+        losses_test: List,
+        losses_valid: List,
+        Y_train: torch.Tensor,
+        pred_energy_train: torch.Tensor,
+        Y_energy_train: torch.Tensor,
+        Y_test: torch.Tensor,
+        pred_energy_test: torch.Tensor,
+        Y_energy_test: torch.Tensor,
+        Y_valid: torch.Tensor,
+        pred_energy_valid: torch.Tensor,
+        Y_energy_valid: torch.Tensor,
+    ) -> NDArray:
         losses = np.array([losses_train, losses_test, losses_valid]).T
         if self.save:
             pred_train = pd.DataFrame(
@@ -338,20 +341,22 @@ class ModelTrainer:
             )
 
             pred_valid.to_pickle(self.folder + "predictions/valid.pkl")
-
-        return pd.DataFrame(losses, columns=["Train_loss", "Test_loss", "Valid_loss"])
+        return losses
 
     def main(self) -> None:
         model_folder = "Models/m" + str(time.time())[:-8] + "/"
 
         print(model_folder)
 
-        os.mkdir(model_folder)
-        os.mkdir(model_folder + "predictions/")
-        shutil.copy("model_config/config.yaml", model_folder + "config.yaml")
+        self.save = False
+
+        if self.save:
+            os.mkdir(model_folder)
+            os.mkdir(model_folder + "predictions/")
+            shutil.copy("model_config/config.yaml", model_folder + "config.yaml")
 
         config = utils.load_config()
-        embeding_size = config["embeding_size"]
+        embeding_size = config["embedding_size"]
         self.epochs = config["epochs"]
         self.batch_size = int(config["batch_size"] / 32)
         self.decay_rate = float(config["decay_rate"])
@@ -360,7 +365,6 @@ class ModelTrainer:
         self.model = eval(config["model"])(embeding_size).to(self.device)
         self.loss_metric = config["loss_metric"]
 
-        self.save = True
         self.folder = model_folder
 
         # self.optimizer = torch.optim.LBFGS(self.model.parameters(), lr=self.lr)

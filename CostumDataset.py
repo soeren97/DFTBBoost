@@ -24,16 +24,12 @@ class CostumDataset(Dataset):
 
         Y = data["Y"]
 
-        HOMO = [row[0] for row in Y]
+        eigenvalues = [row[0] for row in Y]
 
-        LUMO = [row[1] for row in Y]
+        N_orbitals = [row[1] for row in Y]
 
-        eigenvalues = [row[2] for row in Y]
-
-        N_orbitals = [row[3] for row in Y]
-
-        ham_over = [row[4] for row in Y]
+        ham_over = [row[2] for row in Y]
 
         N_electrons = data["N_electrons"].tolist()
 
-        return [X, HOMO, LUMO, eigenvalues, ham_over, N_electrons, N_orbitals]
+        return [X, eigenvalues, ham_over, N_electrons, N_orbitals]

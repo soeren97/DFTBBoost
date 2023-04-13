@@ -8,6 +8,7 @@ from torch import default_generator, randperm
 from torch._utils import _accumulate
 import yaml
 from scipy.stats import binom
+import os
 
 from torch.utils.data.dataset import Subset, Dataset
 from torch_geometric.data import Batch
@@ -32,6 +33,13 @@ def load_config(
     with open(path, "r") as file:
         config = yaml.safe_load(file)
     return config
+
+
+def create_savefolder(folder_name):
+    if os.path.isdir(folder_name):
+        return
+    else:
+        os.makedirs(folder_name)
 
 
 def random_split(
@@ -87,32 +95,17 @@ def convert_tril(tril_tensor: torch.Tensor, n_orbitals: torch.Tensor) -> torch.T
 
 
 def find_eigenvalues_true(
-    hamiltonian: NDArray, overlap: NDArray, n_electrons: int
+    hamiltonian: NDArray, overlap: NDArray, n_orbitals: int
 ) -> List:
-    hamiltonian = torch.Tensor(hamiltonian)
+    # Convert tril tensors to full tensors
+    hamiltonian = convert_tril(hamiltonian, n_orbitals)
 
-    overlap = torch.Tensor(overlap)
+    overlap = convert_tril(overlap, n_orbitals).fill_diagonal_(1)
 
     # Compute eigenvalues
     eigenvalues = eigvalsh(overlap.inverse() @ hamiltonian)
 
-    # pad eigenvalues
-    n_orbitals = len(eigenvalues)
-
-    padded_eigenvalues = torch.zeros([65])
-
-    padded_eigenvalues[:n_orbitals] = eigenvalues
-
-    # find index of HOMO
-    i = n_electrons // 2  # fix?
-
-    # Select fifth eigenvalue above LUMO
-    LUMO = eigenvalues[i + 6]
-
-    # Select fifth eigenvalue bellow HOMO
-    HOMO = eigenvalues[i - 5]
-
-    return [HOMO, LUMO, padded_eigenvalues, n_orbitals]
+    return [eigenvalues, n_orbitals]
 
 
 def find_eigenvalues(
@@ -137,61 +130,35 @@ def find_eigenvalues(
     # Compute eigenvalues
     eigenvalues = eigvalsh(overlaps.inverse() @ hamiltonians)
 
-    mask = torch.arange(65).unsqueeze(0).repeat(
-        n_orbitals.shape[0], 1
-    ) > n_orbitals.unsqueeze(1)
-
-    eigenvalues = eigenvalues * mask
-
-    # find index of HOMO
-    i = n_electrons // 2  # fix?
-
-    # Select fifth eigenvalue above LUMO
-    LUMO = eigenvalues[range(len(eigenvalues)), i + 6]
-
-    # Select fifth eigenvalue bellow HOMO
-    HOMO = eigenvalues[range(len(eigenvalues)), i - 5]
-
-    return eigenvalues, HOMO, LUMO
+    return eigenvalues
 
 
 def costume_collate_NN(batch):
-    X = torch.stack([tensor for entry in batch for tensor in entry[0]], dim=0)
+    X = torch.stack(batch[0]).reshape(-1, 2145)
 
-    HOMO = torch.stack([tensor for entry in batch for tensor in entry[1]], dim=0)
+    eigenvalues = torch.stack(batch[1], dim=0).reshape(-1, 65)
 
-    LUMO = torch.stack([tensor for entry in batch for tensor in entry[2]], dim=0)
+    ham_over = torch.stack(batch[2], dim=0).reshape(-1, 2145 * 2)
 
-    eigenvalues = torch.stack([tensor for entry in batch for tensor in entry[3]], dim=0)
+    n_electrons = torch.stack(batch[3], dim=0).reshape(-1)
 
-    ham_over = torch.stack([tensor for entry in batch for tensor in entry[4]], dim=0)
+    n_orbitals = torch.stack(batch[4], dim=0).reshape(-1)
 
-    n_electrons = torch.stack(
-        [torch.tensor(integer) for entry in batch for integer in entry[5]], dim=0
-    )
-
-    n_orbitals = torch.stack(
-        [torch.tensor(integer) for entry in batch for integer in entry[6]], dim=0
-    )
-    return X, HOMO, LUMO, eigenvalues, ham_over, n_electrons, n_orbitals
+    return X, eigenvalues, ham_over, n_electrons, n_orbitals
 
 
 def costume_collate_GNN(batch):
     X = Batch.from_data_list(batch[0])
 
-    HOMO = torch.stack(batch[1], dim=0).reshape(-1)
+    eigenvalues = torch.stack(batch[1], dim=0).reshape(-1, 65)
 
-    LUMO = torch.stack(batch[2], dim=0).reshape(-1)
+    ham_over = torch.stack(batch[2], dim=0).reshape(-1, 2145 * 2)
 
-    eigenvalues = torch.stack(batch[3], dim=0).reshape(-1, 65)
+    n_electrons = torch.stack(batch[3], dim=0).reshape(-1)
 
-    ham_over = torch.stack(batch[4], dim=0).reshape(-1, 2145 * 2)
+    n_orbitals = torch.stack(batch[4], dim=0).reshape(-1)
 
-    n_electrons = torch.stack(batch[5], dim=0).reshape(-1)
-
-    n_orbitals = torch.stack(batch[6], dim=0).reshape(-1)
-
-    return X, HOMO, LUMO, eigenvalues, ham_over, n_electrons, n_orbitals
+    return X, eigenvalues, ham_over, n_electrons, n_orbitals
 
 
 def extract_fock(matrix: NDArray) -> NDArray:
@@ -256,42 +223,25 @@ def freedman_diaconis_bins(data):
     return int(n_bins)
 
 
-def mixture_func(
+def binominal_dist(
     x: np.ndarray,
-    w1: float,
-    w2: float,
-    mu1: float,
-    mu2: float,
-    sigma1: float,
-    sigma2: float,
-    p: float,
     binom_n: float,
     binom_p: float,
+    A: float
 ) -> np.ndarray:
     """
-    Mixture function of a Poisson distribution and four Gaussian distributions.
+    Binoninal distribution.
 
     Parameters:
-    x (np.ndarray): The x-values to evaluate the function at.
-    w1 (float): The weight of the first Gaussian distribution.
-    w2 (float): The weight of the second Gaussian distribution.
-    mu1 (float): The mean of the first Gaussian distribution.
-    mu2 (float): The mean of the second Gaussian distribution.
-    sigma1 (float): The standard deviation of the first Gaussian distribution.
-    sigma2 (float): The standard deviation of the second Gaussian distribution.
-    p (float): The weight of the Poisson distribution and normalisation factor.
+    x (float): Number of succeses.
     binom_n (float): Binominal number of trials.
     binom_p (float): Binominal chance of succes.
+    A (float): Normalization factor.
 
     Returns:
     np.ndarray: The evaluated values of the mixture function.
     """
-    gaussians = np.array(
-        [
-            w1 * np.exp(-0.5 * ((x - mu1) / sigma1) ** 2),
-            w2 * np.exp(-0.5 * ((x - mu2) / sigma2) ** 2),
-        ]
-    )
-    binom_part = p * binom.pmf(x, binom_n, binom_p)
+    
+    binominal = A * binom.pmf(x, binom_n, binom_p)
 
-    return np.sum(gaussians, axis=0) + binom_part
+    return binominal
