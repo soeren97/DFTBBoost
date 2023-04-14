@@ -7,14 +7,18 @@ import torch
 import yaml
 from scipy.optimize import curve_fit
 
+import sys
+
+sys.path.append(os.getcwd())
+
 from model_handler import ModelTrainer
 from models import GNN
-from utils import find_eigenvalues, load_config, freedman_diaconis_bins, mixture_func
+from utils import find_eigenvalues, load_config, freedman_diaconis_bins, binominal_dist
 
-from typing import Tuple
+from typing import Tuple, List
 
 
-def fit_data_to_dist(data: np.ndarray) -> Tuple:
+def fit_data_to_dist(data: np.ndarray, num_bins: int) -> Tuple:
     """
     Fits data to the mixture function of a Poisson distribution and four Gaussian distributions.
 
@@ -27,16 +31,15 @@ def fit_data_to_dist(data: np.ndarray) -> Tuple:
            and the bin edges.
     """
     # Create a histogram of the sample dataset
-    num_bins = freedman_diaconis_bins(data)
     hist, bin_edges = np.histogram(data, bins=num_bins, density=True)
     bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
 
     # Fit the mixture function to the histogram
-    initial_guess = (0.1, 0.1, 0.7, 9, 1e-3, 1e-3, 5, 0.02, 9)
-    params, _ = curve_fit(mixture_func, bin_centers, hist, p0=initial_guess)
+    initial_guess = (9, 1e-3, 9)
+    params, _ = curve_fit(binominal_dist, bin_centers, hist, p0=initial_guess)
 
     # Compute the standard deviation of the fitted function
-    std = np.mean([params[-4], params[-3], np.sqrt(params[-1])])  # fix binominal std
+    std = np.sqrt(params[0] * params[1] * (1 - params[1]) * params[2])
 
     return std, params, bin_centers
 
@@ -44,7 +47,6 @@ def fit_data_to_dist(data: np.ndarray) -> Tuple:
 def compare_datasets(CONFIG):
     path = f"Data/datasets/NN/"
     files = os.listdir(path)
-    delta_HOMO_LUMO = []
     delta_all = []
     delta_Matrix = []
     for i in tqdm(files, desc="Calc dft, dftb diff", leave=False):
@@ -54,94 +56,166 @@ def compare_datasets(CONFIG):
         Y = data["Y"]
         n_electrons = torch.tensor(data["N_electrons"])
 
-        n_orbitals = [row[3] for row in Y]
-        dft = torch.stack([row[4] for row in Y])
+        n_orbitals = [row[1] for row in Y]
+        dft = torch.stack([row[2] for row in Y])
 
-        dftb_eigenvalues, dftb_HOMO, dftb_LUMO = find_eigenvalues(
-            dftb, n_electrons, n_orbitals
-        )
-        dft_eigenvalues, dft_HOMO, dft_LUMO = find_eigenvalues(
-            dft, n_electrons, n_orbitals
-        )
+        dftb_eigenvalues = find_eigenvalues(dftb, n_electrons, n_orbitals)
+        dft_eigenvalues = find_eigenvalues(dft, n_electrons, n_orbitals)
         distance = torch.norm(dft - dftb, dim=1).numpy()
 
         delta_all.extend(abs(dftb_eigenvalues - dft_eigenvalues).numpy())
-
-        delta_HOMO_LUMO.extend(
-            abs(dftb_HOMO - dft_HOMO) + abs(dftb_LUMO - dft_LUMO).numpy()
-        )
 
         delta_Matrix.extend(distance)
 
     data = np.array(delta_all).reshape(-1)
 
-    num_bins = freedman_diaconis_bins(data)
+    num_bins = int(freedman_diaconis_bins(data) / 2)
 
-    std, params, bin_centers = fit_data_to_dist(data)
+    std, params, bin_centers = fit_data_to_dist(data, num_bins)
     hist, bin_edges = np.histogram(data, bins=num_bins, density=True)
     plt.hist(data, bins=num_bins, density=True, alpha=0.5, label="Error")
-    plt.plot(bin_centers, mixture_func(bin_centers, *params), "r-", label="Fit")
+    plt.plot(bin_centers, binominal_dist(bin_centers, *params), "r-", label="Fit")
     plt.show()
     plt.xlabel("Error")
     plt.ylabel("Frequency")
-    plt.ylim(top=6)
+    plt.xlim(left=0)
     plt.legend()
     plt.tight_layout()
     plt.xticks(np.arange(0, max(hist), 1))
     plt.savefig("Figures/error_dist.png", dpi=300)
 
     mean_delta_all = np.mean(delta_all)
-    mean_delta_HOMO_LUMO = np.mean(delta_HOMO_LUMO)
     mean_distance = np.mean(delta_Matrix)
 
     std_delta_all = np.std(delta_all)
-    std_delta_HOMO_LUMO = np.std(delta_HOMO_LUMO)
     std_distance = np.std(delta_Matrix)
 
     CONFIG["dftb_dft_delta_All"] = float(mean_delta_all)
-    CONFIG["dftb_dft_delta_HOMO_LUMO"] = float(mean_delta_HOMO_LUMO)
     CONFIG["dftb_dft_delta_Matrix"] = float(mean_distance)
 
     CONFIG["dftb_dft_std_All"] = float(std_delta_all)
-    CONFIG["dftb_dft_std_HOMO_LUMO"] = float(std_delta_HOMO_LUMO)
     CONFIG["dftb_dft_std_Matrix"] = float(std_distance)
 
     # with open(r"model_config/config.yaml", "w") as config_file:
     #    updated_file = yaml.dump(CONFIG, config_file)
 
 
+def extract_n_non_h_atoms(data: pd.DataFrame) -> List[int]:
+    graphs = data["X"]
+    n_atom = np.array(
+        [
+            len(graph.node_stores[0]["x"][graph.node_stores[0]["x"] != 0])
+            for graph in graphs
+        ]
+    )
+
+    n_c = np.array(
+        [
+            len(graph.node_stores[0]["x"][graph.node_stores[0]["x"] == 1])
+            for graph in graphs
+        ]
+    )
+
+    n_n = np.array(
+        [
+            len(graph.node_stores[0]["x"][graph.node_stores[0]["x"] == 2])
+            for graph in graphs
+        ]
+    )
+
+    n_o = np.array(
+        [
+            len(graph.node_stores[0]["x"][graph.node_stores[0]["x"] == 3])
+            for graph in graphs
+        ]
+    )
+
+    n_f = np.array(
+        [
+            len(graph.node_stores[0]["x"][graph.node_stores[0]["x"] == 4])
+            for graph in graphs
+        ]
+    )
+
+    n_c = list(n_c[n_c != 0])
+
+    n_n = list(n_n[n_n != 0])
+
+    n_o = list(n_o[n_o != 0])
+
+    n_f = list(n_f[n_f != 0])
+
+    return n_atom, n_c, n_n, n_o, n_f
+
+
 def analyze_dataset():
     path = f"Data/datasets/GNN/"
     files = os.listdir(path)
-    lengths = []
+    n_atoms = []
+    n_carbon = []
+    n_nitrogen = []
+    n_oxygen = []
+    n_flour = []
     energies = []
     matrices = []
-    for i in tqdm(files, desc="Plot number of atoms"):
+    for i in tqdm(files, desc="Extract graph data"):
         data = pd.read_pickle(path + i)
-        graphs = data["X"]
-        length = [graph.num_nodes for graph in graphs]
-        lengths.extend(length)
 
-        matrix = [row[4] for row in data["Y"]]
+        # extract number of non hydrogen atoms
+        n_atom, n_c, n_n, n_o, n_f = extract_n_non_h_atoms(data)
+
+        n_atoms.extend(n_atom)
+        n_carbon.extend(n_c)
+        n_nitrogen.extend(n_n)
+        n_oxygen.extend(n_o)
+        n_flour.extend(n_f)
+
+        matrix = [row[2] for row in data["Y"]]
         matrix = torch.stack(matrix)
         matrices.extend(matrix)
 
-        energy = [row[2] for row in data["Y"]]
+        energy = [row[0] for row in data["Y"]]
         energy = torch.stack(energy)
         energies.extend(energy)
 
     matrices = torch.stack(matrices).reshape(-1, 1).numpy()
     energies = torch.stack(energies).reshape(-1, 1).numpy()
 
-    return lengths, matrices, energies
+    n_atoms_list = [n_atoms, n_carbon, n_nitrogen, n_oxygen, n_flour]
+
+    return n_atoms_list, matrices, energies
 
 
-def plot_n_atoms(lengths):
-    bins = freedman_diaconis_bins(lengths)
+def plot_n_atoms(lengths: List[int], name: str) -> None:
+    bins = 9
     plt.hist(lengths, bins=bins)
-    plt.xlabel("N_atoms")
+    plt.xlabel(name)
     plt.ylabel("Frequency")
-    plt.savefig("Figures/N_atoms.png", dpi=300)
+    plt.yscale("log")
+    plt.savefig(f"Figures/{name}.png", dpi=300)
+    plt.close()
+
+
+def plot_elements(
+    n_c: List[int], n_n: List[int], n_o: List[int], n_f: List[int]
+) -> None:
+    bins = np.arange(0.5, 9.5, 1)
+    plt.hist(
+        [n_c, n_n, n_o, n_f],
+        bins=bins,
+        width=0.2,
+        label=[
+            "Number of Carbons",
+            "Number of Nitrogens",
+            "Number of Oxygens",
+            "Number of Flourines",
+        ],
+    )
+    plt.xlabel("Number of Elements")
+    plt.ylabel("Frequency")
+    plt.yscale("log")
+    plt.legend()
+    plt.savefig(f"Figures/n_elements.png", dpi=300)
     plt.close()
 
 
@@ -168,11 +242,13 @@ def plot_matrix_content(matrices):
 if __name__ == "__main__":
     config = load_config()
     # if None in config.values():
-    compare_datasets(config)
+    # compare_datasets(config)
 
     n_atoms, matrix_content, eigenvalues = analyze_dataset()
 
-    plot_n_atoms(n_atoms)
+    plot_n_atoms(n_atoms[0], "N_Atoms")
+
+    plot_elements(n_atoms[1], n_atoms[2], n_atoms[3], n_atoms[4])
 
     plot_energies(eigenvalues)
 
