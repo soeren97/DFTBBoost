@@ -157,8 +157,6 @@ class ModelTrainer:
             preds, n_electrons, n_orbitals, Y
         )
 
-        loss.backward()
-
         return loss, preds, Y_matrices, n_orbitals, pred_energy, true_energy
 
     def train(
@@ -176,6 +174,8 @@ class ModelTrainer:
                 pred_energy,
                 true_energy,
             ) = self.closure(batch)
+
+            loss.backward()
             self.optimizer.step()
 
         return loss, preds, Y_matrices, pred_energy, true_energy
@@ -265,12 +265,15 @@ class ModelTrainer:
                     losses_test,
                     losses_valid,
                     Y_train,
+                    pred_train,
                     pred_energy_train,
                     Y_energy_train,
                     Y_test,
+                    pred_test,
                     pred_energy_test,
                     Y_energy_test,
                     Y_valid,
+                    pred_valid,
                     pred_energy_valid,
                     Y_energy_valid,
                 )
@@ -280,12 +283,15 @@ class ModelTrainer:
             losses_test,
             losses_valid,
             Y_train,
+            pred_train,
             pred_energy_train,
             Y_energy_train,
             Y_test,
+            pred_test,
             pred_energy_test,
             Y_energy_test,
             Y_valid,
+            pred_valid,
             pred_energy_valid,
             Y_energy_valid,
         )
@@ -298,18 +304,21 @@ class ModelTrainer:
         losses_test: List,
         losses_valid: List,
         Y_train: torch.Tensor,
+        pred_train: torch.Tensor,
         pred_energy_train: torch.Tensor,
         Y_energy_train: torch.Tensor,
         Y_test: torch.Tensor,
+        pred_test: torch.Tensor,
         pred_energy_test: torch.Tensor,
         Y_energy_test: torch.Tensor,
         Y_valid: torch.Tensor,
+        pred_valid: torch.Tensor,
         pred_energy_valid: torch.Tensor,
         Y_energy_valid: torch.Tensor,
     ) -> NDArray:
         losses = np.array([losses_train, losses_test, losses_valid]).T
         if self.save:
-            pred_train = pd.DataFrame(
+            train_df = pd.DataFrame(
                 {
                     "pred": [pred_train.cpu().detach().numpy()],
                     "y": [Y_train.cpu().detach().numpy()],
@@ -318,9 +327,9 @@ class ModelTrainer:
                 }
             )
 
-            pred_train.to_pickle(self.folder + "predictions/train.pkl")
+            train_df.to_pickle(self.folder + "predictions/train.pkl")
 
-            pred_test = pd.DataFrame(
+            test_df = pd.DataFrame(
                 {
                     "pred": [pred_test.cpu().detach().numpy()],
                     "y": [Y_test.cpu().detach().numpy()],
@@ -329,9 +338,9 @@ class ModelTrainer:
                 }
             )
 
-            pred_test.to_pickle(self.folder + "predictions/test.pkl")
+            test_df.to_pickle(self.folder + "predictions/test.pkl")
 
-            pred_valid = pd.DataFrame(
+            valid_df = pd.DataFrame(
                 {
                     "pred": [pred_valid.cpu().detach().numpy()],
                     "y": [Y_valid.cpu().detach().numpy()],
@@ -340,7 +349,7 @@ class ModelTrainer:
                 }
             )
 
-            pred_valid.to_pickle(self.folder + "predictions/valid.pkl")
+            valid_df.to_pickle(self.folder + "predictions/valid.pkl")
         return losses
 
     def main(self) -> None:
@@ -348,7 +357,7 @@ class ModelTrainer:
 
         print(model_folder)
 
-        self.save = False
+        self.save = True
 
         if self.save:
             os.mkdir(model_folder)
