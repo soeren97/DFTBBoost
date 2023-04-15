@@ -18,6 +18,7 @@ from torchmetrics import MeanSquaredLogError as MSLE
 
 from models import GNN_MG, NN, GNN_MG_FO, GNN
 from CostumDataset import CostumDataset
+from plotting.training_plotting import Plotter
 
 from typing import List, Tuple
 from numpy.typing import NDArray
@@ -257,23 +258,7 @@ class ModelTrainer:
             self.evaluate_early_stopping(loss_test)
 
             if self.early_stopping:
-                losses = self.save_prediction(
-                    losses_train,
-                    losses_test,
-                    losses_valid,
-                    Y_train,
-                    pred_train,
-                    pred_energy_train,
-                    Y_energy_train,
-                    Y_test,
-                    pred_test,
-                    pred_energy_test,
-                    Y_energy_test,
-                    Y_valid,
-                    pred_valid,
-                    pred_energy_valid,
-                    Y_energy_valid,
-                )
+                break
 
         losses = self.save_prediction(
             losses_train,
@@ -394,8 +379,11 @@ class ModelTrainer:
 
         loss_df.to_pickle(model_folder + "losses.pkl")
 
+        return model_folder
+
 
 if __name__ == "__main__":
     trainer = ModelTrainer()
     trainer.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    trainer.main()
+    model_folder = trainer.main()
+    Plotter.main(model_folder)
