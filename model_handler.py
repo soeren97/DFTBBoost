@@ -64,8 +64,10 @@ class ModelTrainer:
         if self.model_name in ["GNN", "GNN_MG", "GNN_MG_FO"]:
             self.loader = GNNDataloader
         else:
-            self.loader = lambda dataset: torch.utils.data.DataLoader(
-                dataset, collate_fn=self.collate_fn
+            self.loader = (
+                lambda dataset, batch_size, shuffle: torch.utils.data.DataLoader(
+                    dataset, batch_size, shuffle, collate_fn=self.collate_fn
+                )
             )
 
         self.data = CostumDataset(ml_method=self.model_name)
@@ -83,9 +85,13 @@ class ModelTrainer:
             shuffle=True,
         )
 
-        self.test_loader = self.loader(test_set, batch_size=self.batch_size)
+        self.test_loader = self.loader(
+            test_set, batch_size=self.batch_size, shuffle=False
+        )
 
-        self.valid_loader = self.loader(valid_set, batch_size=self.batch_size)
+        self.valid_loader = self.loader(
+            valid_set, batch_size=self.batch_size, shuffle=False
+        )
 
     def evaluate_early_stopping(self, loss: torch.Tensor) -> None:
         if not self.best_loss >= loss:
@@ -379,11 +385,8 @@ class ModelTrainer:
 
         loss_df.to_pickle(model_folder + "losses.pkl")
 
-        return model_folder
-
 
 if __name__ == "__main__":
     trainer = ModelTrainer()
     trainer.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model_folder = trainer.main()
-    Plotter.main(model_folder)
+    trainer.main()
