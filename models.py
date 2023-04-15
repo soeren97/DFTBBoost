@@ -15,7 +15,7 @@ class GNN(Module):
         self.conv1 = GATConv(self.embedding_size, self.embedding_size)
         self.conv2 = GATConv(self.embedding_size, self.embedding_size)
         self.batchnorm = BatchNorm(self.embedding_size)
-        self.graphnorm = GraphNorm(self.embedding_size, eps=1e-5)
+        self.graphnorm = GraphNorm(self.embedding_size)
         self.out = Linear(self.embedding_size * 2, 2145 * 2)
 
     def forward(self, data):
@@ -62,7 +62,7 @@ class GNN_MG(Module):
         self.initial_conv = GATConv(4, self.embedding_size)
         self.conv1 = GATConv(self.embedding_size, self.embedding_size)
         self.batchnorm = BatchNorm(self.embedding_size)
-        self.graphnorm = GraphNorm(self.embedding_size, eps=1e-5)
+        self.graphnorm = GraphNorm(self.embedding_size)
         self.out = Linear(self.embedding_size * 2, 2145 * 2)
 
     def forward(self, data):
@@ -103,7 +103,7 @@ class GNN_MG_FO(Module):
         self.conv1 = GATConv(self.embedding_size, self.embedding_size)
 
         self.batchnorm = BatchNorm(self.embedding_size)
-        self.graphnorm = GraphNorm(self.embedding_size, eps=1e-5)
+        self.graphnorm = GraphNorm(self.embedding_size)
 
         self.out = Linear(self.embedding_size * 2, 2145 * 2)
 
