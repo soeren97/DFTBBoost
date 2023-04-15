@@ -9,6 +9,10 @@ import torch
 from numpy.typing import NDArray
 from typing import Tuple, List
 
+import sys
+
+sys.path.append(os.getcwd())
+
 from utils import load_config, extract_fock, extract_overlap, freedman_diaconis_bins
 
 sns.set_style("white")
