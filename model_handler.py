@@ -18,7 +18,6 @@ from torchmetrics import MeanSquaredLogError as MSLE
 
 from models import GNN_MG, NN, GNN_MG_FO, GNN
 from CostumDataset import CostumDataset
-from plotting.training_plotting import Plotter
 
 from typing import List, Tuple
 from numpy.typing import NDArray
