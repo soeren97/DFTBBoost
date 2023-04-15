@@ -187,8 +187,8 @@ def analyze_dataset():
 
 
 def plot_n_atoms(lengths: List[int], name: str) -> None:
-    bins = 9
-    plt.hist(lengths, bins=bins)
+    bins = np.arange(0.5, 9.5, 1)
+    plt.hist(lengths, bins=bins, width=0.8)
     plt.xlabel(name)
     plt.ylabel("Frequency")
     plt.yscale("log")
