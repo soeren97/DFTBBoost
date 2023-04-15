@@ -133,16 +133,16 @@ def find_eigenvalues(
     return eigenvalues
 
 
-def costume_collate_NN(batch):
-    X = torch.stack(batch[0]).reshape(-1, 2145)
+def costume_collate_NN(batch: Dict[str, torch.Tensor], ml_method: str):
+    X = torch.cat([d["X"] for d in batch]).float()
 
-    eigenvalues = torch.stack(batch[1], dim=0).reshape(-1, 65)
+    eigenvalues = torch.cat([d["eigenvalues"] for d in batch])
 
-    ham_over = torch.stack(batch[2], dim=0).reshape(-1, 2145 * 2)
+    ham_over = torch.cat([d["ham_over"] for d in batch])
 
-    n_electrons = torch.stack(batch[3], dim=0).reshape(-1)
+    n_electrons = torch.cat([d["N_electrons"] for d in batch])
 
-    n_orbitals = torch.stack(batch[4], dim=0).reshape(-1)
+    n_orbitals = torch.cat([d["N_orbitals"] for d in batch])
 
     return X, eigenvalues, ham_over, n_electrons, n_orbitals
 
@@ -224,10 +224,7 @@ def freedman_diaconis_bins(data):
 
 
 def binominal_dist(
-    x: np.ndarray,
-    binom_n: float,
-    binom_p: float,
-    A: float
+    x: np.ndarray, binom_n: float, binom_p: float, A: float
 ) -> np.ndarray:
     """
     Binoninal distribution.
@@ -241,7 +238,7 @@ def binominal_dist(
     Returns:
     np.ndarray: The evaluated values of the mixture function.
     """
-    
+
     binominal = A * binom.pmf(x, binom_n, binom_p)
 
     return binominal

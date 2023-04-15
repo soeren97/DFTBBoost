@@ -18,8 +18,8 @@ class CostumDataset(Dataset):
         return len(self.file_names)
 
     def __getitem__(self, index: int) -> List[Any]:
+        data = pd.read_pickle(self.file_names[index])
         if self.ml_method != "NN":
-            data = pd.read_pickle(self.file_names[index])
 
             X = data["X"].tolist()
 
@@ -36,8 +36,6 @@ class CostumDataset(Dataset):
             return [X, eigenvalues, ham_over, N_electrons, N_orbitals]
 
         else:
-            data = pd.read_pickle(self.file_names[index])
-
             X = torch.stack(data["X"].tolist())
 
             Y = data["Y"]

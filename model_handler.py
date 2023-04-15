@@ -39,6 +39,7 @@ class ModelTrainer:
 
         self.epochs = None
         self.batch_size = None
+        self.model_name: str
 
         self.train_loader = None
         self.test_loader = None
@@ -55,16 +56,18 @@ class ModelTrainer:
         self.save = False
 
     def setup_data(self) -> None:
-        model_name = self.model.__class__.__name__
+        self.model_name = self.model.__class__.__name__
 
-        if model_name in ["GNN", "GNN_MG", "GNN_MG_FO"]:
+        self.collate_fn = eval(f"utils.costume_collate_{self.model_name}")
+
+        if self.model_name in ["GNN", "GNN_MG", "GNN_MG_FO"]:
             self.loader = GNNDataloader
-            self.collate_fn = utils.costume_collate_GNN
         else:
-            self.loader = torch.utils.data.DataLoader
-            self.collate_fn = utils.costume_collate_NN
+            self.loader = lambda dataset: torch.utils.data.DataLoader(
+                dataset, collate_fn=self.collate_fn
+            )
 
-        self.data = CostumDataset(ml_method=model_name)
+        self.data = CostumDataset(ml_method=self.model_name)
 
         # Ensures same split each time
         generator = torch.Generator().manual_seed(42)
@@ -79,15 +82,9 @@ class ModelTrainer:
             shuffle=True,
         )
 
-        self.test_loader = self.loader(
-            test_set,
-            batch_size=self.batch_size,
-        )
+        self.test_loader = self.loader(test_set, batch_size=self.batch_size)
 
-        self.valid_loader = self.loader(
-            valid_set,
-            batch_size=self.batch_size,
-        )
+        self.valid_loader = self.loader(valid_set, batch_size=self.batch_size)
 
     def evaluate_early_stopping(self, loss: torch.Tensor) -> None:
         if not self.best_loss >= loss:
@@ -133,25 +130,26 @@ class ModelTrainer:
         torch.Tensor,
         torch.Tensor,
     ]:
-        (
-            X,
-            Y_eigenvalues,
-            Y_matrices,
-            n_electrons,
-            n_orbitals,
-        ) = self.collate_fn(batch)
+        if self.model_name != "NN":
+            (
+                X,
+                Y_eigenvalues,
+                Y_matrices,
+                n_electrons,
+                n_orbitals,
+            ) = self.collate_fn(batch)
+        else:
+            (
+                X,
+                Y_eigenvalues,
+                Y_matrices,
+                n_electrons,
+                n_orbitals,
+            ) = batch
 
         Y = [Y_eigenvalues, Y_matrices]
 
-        n_electrons.to(self.device)
-
-        n_orbitals.to(self.device)
-
-        if self.model.__class__.__name__ in ["GNN", "GNN_MG", "GNN_MG_FO"]:
-            preds = self.model(X)
-
-        else:
-            preds = self.model(X.float())
+        preds = self.model(X)
 
         loss, pred_energy, true_energy = self.evaluate_loss(
             preds, n_electrons, n_orbitals, Y
@@ -165,7 +163,6 @@ class ModelTrainer:
         self.optimizer.zero_grad()
         self.model.train()
         for batch in self.train_loader:
-            # loss = self.optimizer.step(lambda: self.closure(batch))
             (
                 loss,
                 preds,
@@ -357,7 +354,7 @@ class ModelTrainer:
 
         print(model_folder)
 
-        self.save = True
+        self.save = False
 
         if self.save:
             os.mkdir(model_folder)
