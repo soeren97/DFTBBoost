@@ -58,11 +58,11 @@ class ModelTrainer:
     def setup_data(self) -> None:
         self.model_name = self.model.__class__.__name__
 
-        self.collate_fn = eval(f"utils.costume_collate_{self.model_name}")
-
         if self.model_name in ["GNN", "GNN_MG", "GNN_MG_FO"]:
+            self.collate_fn = utils.costume_collate_GNN
             self.loader = GNNDataloader
         else:
+            self.collate_fn = utils.costume_collate_NN
             self.loader = (
                 lambda dataset, batch_size, shuffle: torch.utils.data.DataLoader(
                     dataset, batch_size, shuffle, collate_fn=self.collate_fn
@@ -344,14 +344,14 @@ class ModelTrainer:
 
         print(model_folder)
 
-        self.save = False
+        self.save = True
 
         if self.save:
             os.mkdir(model_folder)
             os.mkdir(model_folder + "predictions/")
             shutil.copy("model_config/config.yaml", model_folder + "config.yaml")
 
-        config = utils.load_config()
+        config = utils.load_config(model_name="GNN")
         embeding_size = config["embedding_size"]
         self.epochs = config["epochs"]
         self.batch_size = int(config["batch_size"] / 32)
