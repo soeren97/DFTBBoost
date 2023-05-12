@@ -1,8 +1,10 @@
 import torch
+import os
 from sklearn.isotonic import IsotonicRegression
-from tqdm import tqdm
 
-from models import GNN_minus, GNN, GNN_plus, NN
+from typing import Optional
+
+from models import GNN, GNN_MO, GNN_MG_FO, NN
 import utils
 from torch_geometric.loader import DataLoader as GNNDataloader
 from CostumDataset import CostumDataset
@@ -10,7 +12,6 @@ from CostumDataset import CostumDataset
 
 class Calibrator:
     def __init__(self) -> None:
-        self.folder = None
         self.data = None
 
         self.batch_size = None
@@ -29,7 +30,7 @@ class Calibrator:
     def setup_data(self) -> None:
         model_name = self.model.__class__.__name__
 
-        if model_name in ["GNN", "GNN_plus", "GNN_minus"]:
+        if model_name in ["GNN", "GNN_MG", "GNN_MG_FO"]:
             self.loader = GNNDataloader
             self.collate_fn = utils.costume_collate_GNN
         else:
@@ -44,21 +45,17 @@ class Calibrator:
 
     def setup_loaders(self) -> None:
         self.train_loader = self.loader(
-            self.train_set,
-            batch_size=self.batch_size,
-            shuffle=True,
+            self.train_set, batch_size=self.batch_size, shuffle=True, drop_last=True
         )
 
         self.test_loader = self.loader(
             self.test_set,
             batch_size=self.batch_size,
-            shuffle=True,
         )
 
         self.valid_loader = self.loader(
             self.valid_set,
             batch_size=self.batch_size,
-            shuffle=True,
         )
 
     def setup_model(self) -> None:
@@ -66,29 +63,27 @@ class Calibrator:
         model = torch.load(f"{self.path}/model.pkl")
         self.model = model
 
-    def isotonic_calibration(self, predictions, targets):
+    def isotonic_calibration(self, predictions: torch.Tensor, targets: torch.Tensor):
         iso_reg = IsotonicRegression(out_of_bounds="clip")
         calibrated_model = iso_reg.fit(predictions, targets)
         return calibrated_model
 
-    def fit_model(self):
+    def fit_model(self) -> IsotonicRegression:
         predictions = []
         targets = []
 
         for batch in self.train_loader:
             (
                 X,
-                Y_HOMO,
-                Y_LUMO,
                 Y_eigenvalues,
                 Y_matrices,
                 n_electrons,
                 n_orbitals,
             ) = self.collate_fn(batch)
 
-            target = Y_eigenvalues
+            target = Y_matrices
 
-            if self.model.__class__.__name__ in ["GNN", "GNN_plus", "GNN_minus"]:
+            if self.model.__class__.__name__ in ["GNN", "GNN_MG", "GNN_MG_FO"]:
                 output = self.model(X)
 
             else:
@@ -101,13 +96,20 @@ class Calibrator:
 
         return combined_model
 
-    def main(self):
-        self.path = "Models/m1676225631/"
+    def main(self) -> None:
+        if self.path == None:
+            folders = os.listdir("Models/")
+            folders = sorted(
+                folders, key=lambda x: os.path.getmtime(os.path.join("Models", x))
+            )
+            self.path = "Models/" + folders[-1] + "/"
+
         self.config = utils.load_config(self.path)
+        self.batch_size = int(self.config["batch_size"] / 32)
         self.setup_model()
         self.setup_data()
         self.setup_loaders()
-        self.fit_model()
+        calibrated_model = self.fit_model()
 
 
 if __name__ == "__main__":
