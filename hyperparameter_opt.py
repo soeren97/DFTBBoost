@@ -49,12 +49,12 @@ def train_model_optimization(model_handler, trial) -> float:
 
 
 def hyperparameter_objective(trial: optuna.Trial, trainer: ModelTrainer) -> float:
-    embeding_size = trial.suggest_int("embedding_size", 64, 128)
+    embeding_size = trial.suggest_int("embedding_size", 4, 28)
 
     trainer.model = GNN(embeding_size).to(trainer.device)
     trainer.loss_metric = "All"
 
-    lr = trial.suggest_float("lr", 1e-9, 1e-5, log=True)
+    lr = trial.suggest_float("lr", 1e-6, 1e-4, log=True)
     beta1 = trial.suggest_float("beta1", 0.8, 0.95)
     beta2 = trial.suggest_float("beta2", 0.951, 0.99999)
     decay_rate = trial.suggest_float("decay_rate", 0.001, 0.01)
