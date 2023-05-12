@@ -6,6 +6,7 @@ import os
 import torch
 import yaml
 from scipy.optimize import curve_fit
+from numpy.typing import NDArray
 
 import sys
 
@@ -13,7 +14,13 @@ sys.path.append(os.getcwd())
 
 from model_handler import ModelTrainer
 from models import GNN
-from utils import find_eigenvalues, load_config, freedman_diaconis_bins, binominal_dist
+from utils import (
+    find_eigenvalues,
+    load_config,
+    freedman_diaconis_bins,
+    combine_distributions,
+    fit_histogram_peaks,
+)
 
 from typing import Tuple, List
 
@@ -34,9 +41,12 @@ def fit_data_to_dist(data: np.ndarray, num_bins: int) -> Tuple:
     hist, bin_edges = np.histogram(data, bins=num_bins, density=True)
     bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
 
+    # fit gaussian functions to histogram
+    gaus_fits = fit_histogram_peaks(hist, bin_edges)
+
     # Fit the mixture function to the histogram
-    initial_guess = (9, 1e-3, 9)
-    params, _ = curve_fit(binominal_dist, bin_centers, hist, p0=initial_guess)
+    initial_guess = np.array(gaus_fits[0] + (9, 1e-3, 9), dtype="float64")
+    params, _ = curve_fit(combine_distributions, bin_centers, hist, p0=initial_guess)
 
     # Compute the standard deviation of the fitted function
     std = np.sqrt(params[0] * params[1] * (1 - params[1]) * params[2])
@@ -74,14 +84,16 @@ def compare_datasets(CONFIG):
     std, params, bin_centers = fit_data_to_dist(data, num_bins)
     hist, bin_edges = np.histogram(data, bins=num_bins, density=True)
     plt.hist(data, bins=num_bins, density=True, alpha=0.5, label="Error")
-    plt.plot(bin_centers, binominal_dist(bin_centers, *params), "r-", label="Fit")
+    plt.plot(
+        bin_centers, combine_distributions(bin_centers, *params), "r-", label="Fit"
+    )
     plt.show()
     plt.xlabel("Error")
     plt.ylabel("Frequency")
     plt.xlim(left=0)
     plt.legend()
-    plt.tight_layout()
     plt.xticks(np.arange(0, max(hist), 1))
+    plt.tight_layout()
     plt.savefig("Figures/error_dist.png", dpi=300)
 
     mean_delta_all = np.mean(delta_all)
@@ -148,7 +160,7 @@ def extract_n_non_h_atoms(data: pd.DataFrame) -> List[int]:
     return n_atom, n_c, n_n, n_o, n_f
 
 
-def analyze_dataset():
+def analyze_dataset() -> Tuple[List, NDArray, NDArray]:
     path = f"Data/datasets/GNN/"
     files = os.listdir(path)
     n_atoms = []
@@ -181,6 +193,7 @@ def analyze_dataset():
     matrices = torch.stack(matrices).reshape(-1, 1).numpy()
     energies = torch.stack(energies).reshape(-1, 1).numpy()
 
+    energies = energies[energies != 0]
     n_atoms_list = [n_atoms, n_carbon, n_nitrogen, n_oxygen, n_flour]
 
     return n_atoms_list, matrices, energies
@@ -208,7 +221,7 @@ def plot_elements(
             "Number of Carbons",
             "Number of Nitrogens",
             "Number of Oxygens",
-            "Number of Flourines",
+            "Number of Fluorines",
         ],
     )
     plt.xlabel("Number of Elements")
@@ -219,13 +232,21 @@ def plot_elements(
     plt.close()
 
 
-def plot_energies(energies):
+def plot_energies(energies: NDArray, valence: bool) -> None:
+    if valence:
+        # remove core orbitals
+        mask = energies > -1
+        energies = energies[mask]
+
+        path = "Figures/Energies_valence.png"
+    else:
+        path = "Figures/Energies.png"
+
     bins = freedman_diaconis_bins(energies)
     plt.hist(energies, bins=bins)
-    plt.xlabel("Energy [Ha]")
+    plt.xlabel(f"Energy [Ha]")
     plt.ylabel("Frequency")
-    plt.yscale("log")
-    plt.savefig("Figures/Energies.png", dpi=300)
+    plt.savefig(path, dpi=300)
     plt.close()
 
 
@@ -246,11 +267,12 @@ if __name__ == "__main__":
 
     n_atoms, matrix_content, eigenvalues = analyze_dataset()
 
-    plot_n_atoms(n_atoms[0], "N_Atoms")
+    plot_n_atoms(n_atoms[0], "Number of Atoms")
 
     plot_elements(n_atoms[1], n_atoms[2], n_atoms[3], n_atoms[4])
 
-    plot_energies(eigenvalues)
+    plot_energies(eigenvalues, valence=False)
+    plot_energies(eigenvalues, valence=True)
 
     plot_matrix_content(matrix_content)
 
