@@ -7,7 +7,9 @@ import math
 from torch import default_generator, randperm
 from torch._utils import _accumulate
 import yaml
-from scipy.stats import binom
+from scipy.stats import binom, norm
+from scipy.signal import find_peaks
+from scipy.optimize import curve_fit
 import os
 
 from torch.utils.data.dataset import Subset, Dataset
@@ -133,7 +135,7 @@ def find_eigenvalues(
     return eigenvalues
 
 
-def costume_collate_NN(batch: Dict[str, torch.Tensor], ml_method: str):
+def costume_collate_NN(batch: Dict[str, torch.Tensor]):
     X = torch.cat([d["X"] for d in batch]).float()
 
     eigenvalues = torch.cat([d["eigenvalues"] for d in batch])
@@ -223,22 +225,64 @@ def freedman_diaconis_bins(data):
     return int(n_bins)
 
 
-def binominal_dist(
-    x: np.ndarray, binom_n: float, binom_p: float, A: float
-) -> np.ndarray:
-    """
-    Binoninal distribution.
+def gaussian(x, a, x0, sigma):
+    """1D Gaussian function"""
+    return a * np.exp(-(x - x0) ** 2 / (2 * sigma ** 2))
 
-    Parameters:
-    x (float): Number of succeses.
-    binom_n (float): Binominal number of trials.
-    binom_p (float): Binominal chance of succes.
-    A (float): Normalization factor.
+
+def fit_histogram_peaks(
+    hist: np.ndarray, bins: np.ndarray
+) -> list[tuple[float, float, float]]:
+    """Finds peaks in a histogram and fits them with Gaussian distributions.
+
+    Args:
+        hist: Array of histogram values.
+        bins: Array of bin edges for the histogram.
 
     Returns:
-    np.ndarray: The evaluated values of the mixture function.
+        List of tuples representing the fitted Gaussian distributions.
+        Each tuple has three elements: a scaling constant, a mean, and a standard deviation.
     """
+    # Find peaks in the histogram
+    peaks, _ = find_peaks(hist, height = [0.1, 1])
 
-    binominal = A * binom.pmf(x, binom_n, binom_p)
+    # Fit each peak with a Gaussian distribution
+    fits = []
+    for peak in peaks:
+        x = (bins[peak] + bins[peak + 1]) / 2  # Use bin center as mean guess
+        y = hist[peak]
+        p0 = [y, x, np.std(bins)]  # Initial guess for scaling, mean, and std
+        try:
+            popt, _ = curve_fit(gaussian, bins[:-1], hist, p0=p0)
+            fits.append(tuple(popt))
+        except RuntimeError:
+            continue
 
-    return binominal
+    return fits
+
+
+def combine_distributions(x: NDArray,
+    *args: tuple[float, float, float]
+) -> np.ndarray:
+    """Combine Gaussian and binomial distributions.
+
+    Args:
+        *args: Variable number of tuples representing Gaussian distributions.
+            Each tuple should have three elements: a scaling factor, a mean, and a standard deviation.
+
+    Returns:
+        np.ndarray: Probability mass function for the combined distribution.
+    """
+    A = args[-3]
+    n = args[-2]
+    p = args[-1]
+    gaussians = args[:-3]
+    pmf = np.zeros(len(x))
+    for i in range(int(len(gaussians)/3)):
+        scale = gaussians[i*3]
+        mean = gaussians[i*3 + 1]
+        std = gaussians[i*3 + 2]
+        pmf += scale * norm.pdf(x, loc=mean, scale=std)
+    pmf /= np.sum(pmf)
+    pmf *= A * binom.pmf(x, n, p)
+    return pmf
