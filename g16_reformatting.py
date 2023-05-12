@@ -3,13 +3,13 @@ import os
 import pandas as pd
 
 
-def extract_from_xyz(file_nr: int) -> None:
+def extract_from_xyz(file_nr: int, root_dir: str) -> None:
 
     file_name = os.listdir(data_location)[file_nr]
 
     folder_name = file_name[:-10] + str(file_nr + 1)
 
-    if os.path.exists(os.getcwd() + "/Data/G16/" + folder_name + "/mol.com"):
+    if os.path.exists(root_dir + folder_name + "/mol.com"):
         return
 
     file_location = data_location + file_name
@@ -36,11 +36,11 @@ def extract_from_xyz(file_nr: int) -> None:
         dtype="unicode",
     )[0]
 
-    os.makedirs("Data/G16/" + folder_name, exist_ok=True)
+    os.makedirs(root_dir + folder_name, exist_ok=True)
 
     atom_list = []
 
-    with open("Data/G16/" + folder_name + "/mol.com", "w+") as com_writer:
+    with open(root_dir + folder_name + "/mol.com", "w+") as com_writer:
         com_writer.write("%NprocShared=4\n")
         com_writer.write("%Mem=8GB\n")
         com_writer.write("%chk=mol.chk\n")
@@ -63,6 +63,8 @@ def extract_from_xyz(file_nr: int) -> None:
 
 data_location = os.getcwd() + "/Data/xyz_wrong_format/"
 
-file_numbers = pd.DataFrame(range(0, 100001))
+save_location = "Data/G16_test_eigenvalues/"
 
-file_numbers[0].apply(extract_from_xyz)
+file_numbers = pd.DataFrame(range(0, 10000))
+
+file_numbers[0].apply(lambda number: extract_from_xyz(number, save_location))
