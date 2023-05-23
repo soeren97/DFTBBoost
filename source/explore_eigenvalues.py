@@ -2,7 +2,7 @@ import re
 import os
 from tqdm import tqdm
 import numpy as np
-from utils import freedman_diaconis_bins
+from source.utils import freedman_diaconis_bins
 import matplotlib.pyplot as plt
 import pickle
 

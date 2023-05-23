@@ -4,8 +4,8 @@ import torch
 import yaml
 from datetime import datetime
 
-from model_handler import ModelTrainer
-from models import GNN_MG, NN, GNN_MG_FO, GNN
+from source.Models.model_handler import ModelTrainer
+from source.Models.models import GNN_MG, NN, GNN_MG_FO, GNN
 
 from torchmetrics import MeanAbsolutePercentageError as MAPE
 from torchmetrics import MeanSquaredError as MSE

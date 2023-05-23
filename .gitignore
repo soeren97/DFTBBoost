@@ -1,9 +1,7 @@
 Data/
 Report/
 Models/
-.vscode
 __pycache__/
-*.sh
 write_hsd.py
 prepare*
 g16_reformating.py
@@ -11,3 +9,8 @@ compare_dftb_g16.py
 Optuna/
 Figures/
 model_config/
+build/
+
+*.sh
+*.vscode
+*.egg-info

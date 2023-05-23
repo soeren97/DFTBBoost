@@ -4,10 +4,10 @@ from sklearn.isotonic import IsotonicRegression
 
 from typing import Optional
 
-from models import GNN, GNN_MO, GNN_MG_FO, NN
-import utils
+from source.Models.models import GNN, GNN_MO, GNN_MG_FO, NN
+import source.utils as utils
 from torch_geometric.loader import DataLoader as GNNDataloader
-from CostumDataset import CostumDataset
+from source.Data.CostumDataset import CostumDataset
 
 
 class Calibrator:
