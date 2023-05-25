@@ -14,10 +14,10 @@ repos:
     rev: 6.0.0
     hooks:
       - id: flake8
-        args: [--ignore, E722, --extend-ignore, E501, --extend-ignore, W503, --max-line-length, '88']
+        args: [--ignore, E722, --extend-ignore, E501, --extend-ignore, W503, --extend-ignore, E203, --max-line-length, '88']
 
   - repo: https://github.com/pre-commit/mirrors-autopep8
     rev: v2.0.2
     hooks:
       - id: autopep8
-        args: [--max-line-length, '88', --in-place]
+        args: [--max-line-length, '88', --in-place, --ignore, E203]

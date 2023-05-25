@@ -1,22 +1,21 @@
-import torch
-import numpy as np
-import pandas as pd
-from torch.linalg import eigvalsh
-import warnings
+"""Various functions used different places."""
 import math
+import os
+import warnings
+from typing import Dict, Generator, List, Optional, Sequence, Tuple, Union
+
+import numpy as np
+import torch
+import yaml
+from numpy.typing import NDArray
+from scipy.optimize import curve_fit
+from scipy.signal import find_peaks
+from scipy.stats import binom, norm
 from torch import default_generator, randperm
 from torch._utils import _accumulate
-import yaml
-from scipy.stats import binom, norm
-from scipy.signal import find_peaks
-from scipy.optimize import curve_fit
-import os
-
-from torch.utils.data.dataset import Subset, Dataset
+from torch.linalg import eigvalsh
+from torch.utils.data.dataset import Dataset, Subset
 from torch_geometric.data import Batch
-
-from typing import Sequence, Union, Generator, List, Dict, Tuple, Optional
-from numpy.typing import NDArray
 
 
 def load_config(
@@ -25,9 +24,16 @@ def load_config(
     """Function to load in configuration file for model.
 
     Used to easily change variables such as learning rate,
-    loss function and such
+    loss function and such.
+
+    Args:
+        path (Optional[str], optional): path to config file. Defaults to None.
+        model_name (Optional[str], optional): Name of model. Defaults to "config".
+
+    Returns:
+        Dict: Model config.
     """
-    if path == None:
+    if path is None:
         path = f"model_config/{model_name}.yaml"
     else:
         path = f"{path}config.yaml"
@@ -37,7 +43,12 @@ def load_config(
     return config
 
 
-def create_savefolder(folder_name):
+def create_savefolder(folder_name: str) -> None:
+    """Create a safe folder if it does not exist.
+
+    Args:
+        folder_name (str): Name of fodler
+    """
     if os.path.isdir(folder_name):
         return
     else:
@@ -50,7 +61,20 @@ def random_split(
     generator: Generator = default_generator,
 ) -> List[Subset[torch.Tensor]]:
     """As an older version of torch is used random split was not implimented.
-    This function is a copy of the currently implimented torch.utils.data.random_split().
+
+    This function is a copy of the currently used torch.utils.data.random_split().
+
+    Args:
+        dataset (Dataset[torch.Tensor]): Dataset to be split.
+        lengths (Sequence[Union[int, float]]): Lengths of the split.
+        generator (Generator, optional): Generator. Defaults to default_generator.
+
+    Raises:
+        ValueError: Length of dataset is zero
+        ValueError: Cannot verify that dataset is Sized
+
+    Returns:
+        List[Subset[torch.Tensor]]: Split dataset.
     """
     if math.isclose(sum(lengths), 1) and sum(lengths) <= 1:
         subset_lengths: list[int] = []
@@ -80,7 +104,8 @@ def random_split(
             "Sum of input lengths does not equal the length of the input dataset!"
         )
 
-    indices = randperm(sum(lengths), generator=generator).tolist()  # type: ignore[call-overload]
+    # type: ignore[call-overload]
+    indices = randperm(sum(lengths), generator=generator).tolist()
     return [
         Subset(dataset, indices[offset - length : offset])
         for offset, length in zip(_accumulate(lengths), lengths)
@@ -88,6 +113,15 @@ def random_split(
 
 
 def convert_tril(tril_tensor: torch.Tensor, n_orbitals: torch.Tensor) -> torch.Tensor:
+    """Convert triangle array to matrix.
+
+    Args:
+        tril_tensor (torch.Tensor): Triangle array.
+        n_orbitals (torch.Tensor): Number of orbitals.
+
+    Returns:
+        torch.Tensor: Matrix.
+    """
     tensor = torch.zeros(65, 65, dtype=torch.float32)
     indices = torch.tril_indices(65, 65)
     tensor[indices[0], indices[1]] = tril_tensor.to(torch.float)
@@ -96,16 +130,24 @@ def convert_tril(tril_tensor: torch.Tensor, n_orbitals: torch.Tensor) -> torch.T
     return tensor
 
 
-def find_eigenvalues_true(
-    hamiltonian: NDArray, overlap: NDArray, n_orbitals: int
-) -> List:
+def find_eigenvalues_true(fock: NDArray, overlap: NDArray, n_orbitals: int) -> List:
+    """Calculate true eigenvales.
+
+    Args:
+        fock (NDArray): Fock matrix.
+        overlap (NDArray): Overlap matrix.
+        n_orbitals (int): Number of orbitals.
+
+    Returns:
+        List: Eigenvalues.
+    """
     # Convert tril tensors to full tensors
-    hamiltonian = convert_tril(hamiltonian, n_orbitals)
+    fock = convert_tril(fock, n_orbitals)
 
     overlap = convert_tril(overlap, n_orbitals).fill_diagonal_(1)
 
     # Compute eigenvalues
-    eigenvalues = eigvalsh(overlap.inverse() @ hamiltonian)
+    eigenvalues = eigvalsh(overlap.inverse() @ fock)
 
     return [eigenvalues, n_orbitals]
 
@@ -113,10 +155,20 @@ def find_eigenvalues_true(
 def find_eigenvalues(
     preds: torch.Tensor, n_electrons: torch.Tensor, n_orbitals: List[torch.Tensor]
 ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    """Calculate predicted eigenvalues.
+
+    Args:
+        preds (torch.Tensor): Predictions
+        n_electrons (torch.Tensor): Number of electrons
+        n_orbitals (List[torch.Tensor]): Number of orbitals.
+
+    Returns:
+        Tuple[torch.Tensor, torch.Tensor, torch.Tensor]: Eigenvalues.
+    """
     n_electrons = n_electrons.numpy()
 
     # Convert tril tensors to full tensors
-    hamiltonians = [
+    focks = [
         convert_tril(pred[:2145], n_orbital)
         for pred, n_orbital in zip(preds, n_orbitals)
     ]
@@ -127,15 +179,23 @@ def find_eigenvalues(
     ]
 
     overlaps = torch.stack(overlaps, dim=0)
-    hamiltonians = torch.stack(hamiltonians, dim=0)
+    focks = torch.stack(focks, dim=0)
 
     # Compute eigenvalues
-    eigenvalues = eigvalsh(overlaps.inverse() @ hamiltonians)
+    eigenvalues = eigvalsh(overlaps.inverse() @ focks)
 
     return eigenvalues
 
 
-def costume_collate_NN(batch: Dict[str, torch.Tensor]):
+def costume_collate_NN(batch: Dict[str, torch.Tensor]) -> Tuple[torch.Tensor]:
+    """Collate function to help load in batch data for the NN model.
+
+    Args:
+        batch (Dict[str, torch.Tensor]): Batch in need of transformation.
+
+    Returns:
+        Tuple[torch.Tensor]: Molecule properties.
+    """
     X = torch.cat([d["X"] for d in batch]).float()
 
     eigenvalues = torch.cat([d["eigenvalues"] for d in batch])
@@ -149,7 +209,15 @@ def costume_collate_NN(batch: Dict[str, torch.Tensor]):
     return X, eigenvalues, ham_over, n_electrons, n_orbitals
 
 
-def costume_collate_GNN(batch):
+def costume_collate_GNN(batch: Dict[str, torch.Tensor]) -> Tuple[torch.Tensor]:
+    """Collate function to help load in batch data for the graph models.
+
+    Args:
+        batch (Dict[str, torch.Tensor]): Batch in need of transformation.
+
+    Returns:
+        Tuple[torch.Tensor]: Molecule properties.
+    """
     X = Batch.from_data_list(batch[0])
 
     eigenvalues = torch.stack(batch[1], dim=0).reshape(-1, 65)
@@ -164,55 +232,40 @@ def costume_collate_GNN(batch):
 
 
 def extract_fock(matrix: NDArray) -> NDArray:
-    hf_matrix = matrix[:2145]
-    return np.array(hf_matrix)
+    """Extract Fock matrix from concatenated overlap and Fock array.
+
+    Args:
+        matrix (NDArray): Concatenated overlap and Fock array.
+
+    Returns:
+        NDArray: Fock array.
+    """
+    fock_matrix = matrix[:2145]
+    return np.array(fock_matrix)
 
 
 def extract_overlap(matrix: NDArray) -> NDArray:
+    """Extract overlap matrix from concatenated overlap and Fock array.
+
+    Args:
+        matrix (NDArray): Concatenated overlap and Fock array.
+
+    Returns:
+        NDArray: Overlap array.
+    """
     overlap_matrix = matrix[2145:]
     return np.array(overlap_matrix)
 
 
-def calculate_transmission(
-    fock_matrix: NDArray, overlap_matrix: NDArray, energy_range: NDArray
-) -> float:
-    # Calculate Hamiltonian matrix
-    hamiltonian_matrix = fock_matrix + overlap_matrix
+def freedman_diaconis_bins(data: NDArray) -> int:
+    """Calculate the right number of bins for a histogram.
 
-    # Calculate Green's function
-    greens_function = np.linalg.inv(
-        energy_range * np.identity(len(hamiltonian_matrix)) - hamiltonian_matrix
-    )
+    Args:
+        data (NDArray): Data.
 
-    # Calculate transmission coefficient
-    left_matrix = np.matmul(
-        np.matmul(
-            np.conj(
-                np.transpose(
-                    greens_function[: len(overlap_matrix), : len(overlap_matrix)]
-                )
-            ),
-            overlap_matrix,
-        ),
-        greens_function[: len(overlap_matrix), : len(overlap_matrix)],
-    )
-    right_matrix = np.matmul(
-        np.matmul(
-            np.conj(
-                np.transpose(
-                    greens_function[-len(overlap_matrix) :, -len(overlap_matrix) :]
-                )
-            ),
-            overlap_matrix,
-        ),
-        greens_function[-len(overlap_matrix) :, -len(overlap_matrix) :],
-    )
-    transmission = np.trace(np.matmul(left_matrix, np.conj(np.transpose(right_matrix))))
-
-    return transmission.real
-
-
-def freedman_diaconis_bins(data):
+    Returns:
+        int: Number of bins.
+    """
     # Calculate the interquartile range (IQR) of the data
     iqr = np.subtract(*np.percentile(data, [75, 25]))
 
@@ -225,15 +278,26 @@ def freedman_diaconis_bins(data):
     return int(n_bins)
 
 
-def gaussian(x, a, x0, sigma):
-    """1D Gaussian function"""
-    return a * np.exp(-(x - x0) ** 2 / (2 * sigma ** 2))
+def gaussian(x: NDArray, a: float, x0: float, sigma: float) -> NDArray:
+    """
+    Calculate the value of a Gaussian function at given points.
+
+    Args:
+        x: Input array of points.
+        a: Amplitude of the Gaussian function.
+        x0: Mean (center) of the Gaussian function.
+        sigma: Standard deviation of the Gaussian function.
+
+    Returns:
+        NDArray: Array of values representing the Gaussian function at each point.
+    """
+    return a * np.exp(-((x - x0) ** 2) / (2 * sigma**2))
 
 
 def fit_histogram_peaks(
-    hist: np.ndarray, bins: np.ndarray
+    hist: NDArray, bins: NDArray
 ) -> list[tuple[float, float, float]]:
-    """Finds peaks in a histogram and fits them with Gaussian distributions.
+    """Find peaks in a histogram and fits them with Gaussian distributions.
 
     Args:
         hist: Array of histogram values.
@@ -241,10 +305,10 @@ def fit_histogram_peaks(
 
     Returns:
         List of tuples representing the fitted Gaussian distributions.
-        Each tuple has three elements: a scaling constant, a mean, and a standard deviation.
+        Tuple contains: A scaling constant, a mean, and a standard deviation.
     """
     # Find peaks in the histogram
-    peaks, _ = find_peaks(hist, height = [0.1, 1])
+    peaks, _ = find_peaks(hist, height=[0.1, 1])
 
     # Fit each peak with a Gaussian distribution
     fits = []
@@ -261,27 +325,25 @@ def fit_histogram_peaks(
     return fits
 
 
-def combine_distributions(x: NDArray,
-    *args: tuple[float, float, float]
-) -> np.ndarray:
+def combine_distributions(x: NDArray, *args: tuple[float, float, float]) -> NDArray:
     """Combine Gaussian and binomial distributions.
 
     Args:
         *args: Variable number of tuples representing Gaussian distributions.
-            Each tuple should have three elements: a scaling factor, a mean, and a standard deviation.
+            Each tuple contains: a scaling factor, a mean, and a standard deviation.
 
     Returns:
-        np.ndarray: Probability mass function for the combined distribution.
+        NDArray: Probability mass function for the combined distribution.
     """
     A = args[-3]
     n = args[-2]
     p = args[-1]
     gaussians = args[:-3]
     pmf = np.zeros(len(x))
-    for i in range(int(len(gaussians)/3)):
-        scale = gaussians[i*3]
-        mean = gaussians[i*3 + 1]
-        std = gaussians[i*3 + 2]
+    for i in range(int(len(gaussians) / 3)):
+        scale = gaussians[i * 3]
+        mean = gaussians[i * 3 + 1]
+        std = gaussians[i * 3 + 2]
         pmf += scale * norm.pdf(x, loc=mean, scale=std)
     pmf /= np.sum(pmf)
     pmf *= A * binom.pmf(x, n, p)
