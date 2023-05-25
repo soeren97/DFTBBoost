@@ -1,10 +1,13 @@
-import numpy as np
-import matplotlib.pyplot as plt
-import torch
+"""Plotting not directly related to the training and analysis."""
 import os
 
+import matplotlib.pyplot as plt
+import numpy as np
+import torch
 
-def plot_tanh():
+
+def plot_tanh() -> None:
+    """Plot the tanh function."""
     save_location = os.path.join(os.getcwd(), "Figures", "tanh.png")
 
     x = np.linspace(-5, 5, 100)
