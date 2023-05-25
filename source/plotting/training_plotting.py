@@ -1,21 +1,25 @@
+"""Plotting of the training of models."""
 import os
+from typing import List, Tuple
+
 import matplotlib.pyplot as plt
-import pandas as pd
 import numpy as np
-import torch
-
+import pandas as pd
 from numpy.typing import NDArray
-from typing import Tuple, List
 
-import sys
-
-sys.path.append(os.getcwd())
-
-from source.utils import load_config, extract_fock, extract_overlap, freedman_diaconis_bins
+from source.utils import (
+    extract_fock,
+    extract_overlap,
+    freedman_diaconis_bins,
+    load_config,
+)
 
 
 class Plotter:
+    """Class to hold constants and functions."""
+
     def __init__(self) -> None:
+        """Initialize class."""
         self.path = None
         self.save_dir = None
 
@@ -33,7 +37,19 @@ class Plotter:
         List[NDArray],
         List[NDArray],
     ]:
-        if self.path == None:
+        """Load training data from pickle file.
+
+        Returns:
+            Tuple[ pd.DataFrame,
+            List[NDArray],
+            List[NDArray],
+            List[NDArray],
+            List[NDArray],
+            List[NDArray],
+            List[NDArray], ]:
+            Loss, predictions and targets.
+        """
+        if self.path is None:
             folders = os.listdir("Models/")
             folders = sorted(
                 folders, key=lambda x: os.path.getmtime(os.path.join("Models", x))
@@ -80,6 +96,11 @@ class Plotter:
         )
 
     def plot_loss(self, loss: pd.DataFrame) -> None:
+        """Plot training and test loss togther.
+
+        Args:
+            loss (pd.DataFrame): Loss of the model.
+        """
         fig, ax = plt.subplots()
         loss_train = loss.Train_loss
         loss_test = loss.Test_loss
@@ -139,6 +160,14 @@ class Plotter:
         data_name: str,
         split: bool,
     ) -> None:
+        """Plot predicted and true energies as heatmaps.
+
+        Args:
+            energies_true (pd.Series): True energies
+            energies_pred (pd.Series): Predicted energies.
+            data_name (str): Validation or test.
+            split (bool): Should only valence orbitals be included.
+        """
         fig, ax = plt.subplots()
 
         # Stack energies of all molecules
@@ -199,6 +228,14 @@ class Plotter:
         data_name: str,
         split: bool,
     ) -> None:
+        """Plot predicted and true energies as a histogram.
+
+        Args:
+            energies_true (pd.Series): True energies
+            energies_pred (pd.Series): Predicted energies
+            data_name (str): Validation or test.
+            split (bool): Should each grouping be shown seperatly.
+        """
         # Stack energies of all molecules
         energies_true = np.hstack(energies_true[0])
         energies_pred = np.hstack(energies_pred[0])
@@ -291,6 +328,11 @@ class Plotter:
             plt.close()
 
     def main(self, path: str = None) -> None:
+        """Plot all figures.
+
+        Args:
+            path (str, optional): Path to model data. Defaults to None.
+        """
         self.path = path
 
         (
