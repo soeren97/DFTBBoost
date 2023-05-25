@@ -1,36 +1,37 @@
-import pandas as pd
+""" Investigate the structure and proberties of the molecules in the dataset."""
+import os
+from typing import List, Tuple
+
 import matplotlib.pyplot as plt
 import numpy as np
-from tqdm import tqdm
-import os
+import pandas as pd
 import torch
-from scipy.optimize import curve_fit
 from numpy.typing import NDArray
+from scipy.optimize import curve_fit
+from tqdm import tqdm
 
-from source.Models.model_handler import ModelTrainer
-from source.Models.models import GNN
+# from source.models.model_handler import ModelTrainer
+from source.models.models import GNN  # noqa: F401
 from source.utils import (
-    find_eigenvalues,
-    load_config,
-    freedman_diaconis_bins,
     combine_distributions,
+    find_eigenvalues,
     fit_histogram_peaks,
+    freedman_diaconis_bins,
+    load_config,
 )
-
-from typing import Tuple, List
 
 
 def fit_data_to_dist(data: np.ndarray, num_bins: int) -> Tuple:
     """
-    Fits data to the mixture function of a Poisson distribution and four Gaussian distributions.
+    Fit data to the mixture functions.
 
     Parameters:
     data (np.ndarray): The data to fit the function to.
     num_bins (int): The number of bins to use for the histogram.
 
     Returns:
-    tuple: A tuple containing the standard deviation of the fit, the optimized parameters, the counts in each bin,
-           and the bin edges.
+    tuple: A tuple containing the standard deviation of the fit, the optimized
+    parameters, the counts in each bin and the bin edges.
     """
     # Create a histogram of the sample dataset
     hist, bin_edges = np.histogram(data, bins=num_bins, density=True)
@@ -50,7 +51,7 @@ def fit_data_to_dist(data: np.ndarray, num_bins: int) -> Tuple:
 
 
 def compare_datasets(CONFIG):
-    path = f"Data/datasets/NN/"
+    path = "Data/datasets/NN/"
     files = os.listdir(path)
     delta_all = []
     delta_Matrix = []
@@ -156,7 +157,7 @@ def extract_n_non_h_atoms(data: pd.DataFrame) -> List[int]:
 
 
 def analyze_dataset() -> Tuple[List, NDArray, NDArray]:
-    path = f"Data/datasets/GNN/"
+    path = "Data/datasets/GNN/"
     files = os.listdir(path)
     n_atoms = []
     n_carbon = []
@@ -223,7 +224,7 @@ def plot_elements(
     plt.ylabel("Frequency")
     plt.yscale("log")
     plt.legend()
-    plt.savefig(f"Figures/n_elements.png", dpi=300)
+    plt.savefig("Figures/n_elements.png", dpi=300)
     plt.close()
 
 
@@ -239,7 +240,7 @@ def plot_energies(energies: NDArray, valence: bool) -> None:
 
     bins = freedman_diaconis_bins(energies)
     plt.hist(energies, bins=bins)
-    plt.xlabel(f"Energy [Ha]")
+    plt.xlabel("Energy [Ha]")
     plt.ylabel("Frequency")
     plt.savefig(path, dpi=300)
     plt.close()
