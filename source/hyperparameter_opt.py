@@ -1,21 +1,34 @@
-import optuna
 import os
-import torch
-import yaml
 from datetime import datetime
 
-from source.Models.model_handler import ModelTrainer
-from source.Models.models import GNN_MG, NN, GNN_MG_FO, GNN
+import optuna
+import torch
+import yaml
+from optuna import Trial
+from torchmetrics import MeanAbsoluteError as MAE  # noqa: F401
+from torchmetrics import MeanAbsolutePercentageError as MAPE  # noqa: F401
+from torchmetrics import MeanSquaredError as MSE  # noqa: F401
+from torchmetrics import MeanSquaredLogError as MSLE  # noqa: F401
 
-from torchmetrics import MeanAbsolutePercentageError as MAPE
-from torchmetrics import MeanSquaredError as MSE
-from torchmetrics import MeanAbsoluteError as MAE
-from torchmetrics import MeanSquaredLogError as MSLE
+from source.models.model_handler import ModelTrainer
+from source.models.models import GNN, GNN_MG, GNN_MG_FO, NN  # noqa: F401
 
 # optuna.logging.set_verbosity(optuna.logging.WARNING)
 
 
-def train_model_optimization(model_handler, trial) -> float:
+def train_model_optimization(model_handler: ModelTrainer, trial: Trial) -> float:
+    """Train model for optimization.
+
+    Args:
+        model_handler (ModelTrainer): Object used to handle the model.
+        trial (Trial): Current trail.
+
+    Raises:
+        optuna.TrialPruned: If Trial is pruned stop training and go to next trial.
+
+    Returns:
+        float: Loss of trial.
+    """
     for epoch in range(model_handler.epochs):
         (
             loss_train,
@@ -48,7 +61,16 @@ def train_model_optimization(model_handler, trial) -> float:
     return loss_test
 
 
-def hyperparameter_objective(trial: optuna.Trial, trainer: ModelTrainer) -> float:
+def hyperparameter_objective(trial: Trial, trainer: ModelTrainer) -> float:
+    """Function to be optimized.
+
+    Args:
+        trial (Trial): Current trial.
+        trainer (ModelTrainer): Object used to handle the model.
+
+    Returns:
+        float: Loss of current trial.
+    """
     embeding_size = trial.suggest_int("embedding_size", 4, 28)
 
     trainer.model = GNN(embeding_size).to(trainer.device)
@@ -86,6 +108,7 @@ def hyperparameter_objective(trial: optuna.Trial, trainer: ModelTrainer) -> floa
 
 
 def optimize_model():
+    """Optimize model."""
     now = datetime.now().strftime("%y_%m_%d_%H_%M")
 
     model_trainer = ModelTrainer()
