@@ -12,4 +12,5 @@ plotly >= 5.14.1
 black
 isort
 flake8
+autopep8
 pre-commit
