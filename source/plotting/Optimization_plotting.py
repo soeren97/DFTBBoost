@@ -1,20 +1,27 @@
+"""Plotting related to hyperparameter optimization."""
 import os
 from typing import Optional, Tuple
 
-import matplotlib.pyplot as plt
-from plotly.graph_objects import Figure
-
 import optuna
 from optuna.visualization import (
-    plot_param_importances,
     plot_optimization_history,
     plot_parallel_coordinate,
+    plot_param_importances,
 )
+from plotly.graph_objects import Figure
 
 
 def load_study(path: Optional[str] = None) -> Tuple[optuna.study.Study, str]:
+    """Load in a completed study.
+
+    Args:
+        path (Optional[str], optional): Path to the study.. Defaults to None.
+
+    Returns:
+        Tuple[optuna.study.Study, str]: A completed study.
+    """
     root_dir = "Optuna/"
-    if path == None:
+    if path is None:
         studies = os.listdir(root_dir)
 
         studies = sorted(
@@ -34,6 +41,14 @@ def load_study(path: Optional[str] = None) -> Tuple[optuna.study.Study, str]:
 def save_image(
     path: str, plotly_figure: Figure, update_traces: Optional[bool] = False
 ) -> None:
+    """Save plotly image to folder.
+
+    Args:
+        path (str): Desired save name.
+        plotly_figure (Figure): Figure that should be saved.
+        update_traces (Optional[bool], optional):
+        Should update traces be used. Defaults to False.
+    """
     plotly_figure.update_layout(plot_bgcolor="white")
 
     if update_traces:
