@@ -14,7 +14,7 @@ Create a conda enviroment and activate it
 Install pip and required packages. If GPU is available write it in the brackets otherwise write CPU
 
 * conda install pip
-* conda install .[GPU]
+* conda install -e .[GPU]
 
 Activate pre-commit hooks 
 

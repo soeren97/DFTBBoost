@@ -19,5 +19,6 @@ setup(
         'CPU': [
             'torch'
         ]
-    }
+    },
+    editables=['./source']
 )
